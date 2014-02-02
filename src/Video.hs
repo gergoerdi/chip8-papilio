@@ -31,7 +31,7 @@ emitBench = do
     writeUCF (outPath </> modName <.> "ucf") kleg
   where
     modName = "Video"
-    outPath = ".." </> "ise" </> "src"
+    outPath = ".." </> "ise" </> "gensrc"
     outVHDL name = outPath </> name <.> "vhdl"
 
 main :: IO ()

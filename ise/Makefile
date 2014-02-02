@@ -6,22 +6,26 @@ HS_MODS		=
 LAVADIR		= ../src
 HS_SRCS		= $(patsubst %, $(LAVADIR)/%.hs, $(HS_MODS) $(TOP))
 SRCDIR		= src
+GENSRCDIR	= gensrc
 FPGA		= XC3S500E-VQ100-4
 XSTDIR		= xst
 
-UCF		= $(patsubst %, $(SRCDIR)/%.ucf, $(MAIN))
-GEN_VHDLS	= $(patsubst %, $(SRCDIR)/%.vhdl, lava-prelude $(MAIN))
+UCF		= $(patsubst %, $(GENSRCDIR)/%.ucf, $(MAIN))
+LAVA_VHDLS	= $(patsubst %, $(GENSRCDIR)/%.vhdl, lava-prelude $(MAIN))
+XAW_VHDLS	= $(patsubst %, $(GENSRCDIR)/%.vhdl, $(XAW_MODS))
 VHDL_SRCS	= $(patsubst %, $(SRCDIR)/%.vhdl, $(VHDL_MODS))
-VHDLS		= $(GEN_VHDLS) $(VHDL_SRCS)
+VHDLS		= $(LAVA_VHDLS) $(XAW_VHDLS) $(VHDL_SRCS)
 
-GEN_EXTS	= bgn bit bld drc ncd ngc ngd ngr pad par pcf prj ptwx syr unroutes ut xpi xst
+GEN_EXTS	= bgn bit bld drc ncd ngc ngd ngr pad par pcf ptwx syr unroutes ut xpi xst prj
 GEN_MAP_EXTS	= map mrp ncd ngm
-GENS		= $(GEN_VHDLS) \
+GENS		= $(LAVA_VHDLS) \
 		  $(patsubst %, $(MAIN).%, $(GEN_EXTS)) \
 		  $(patsubst %, $(MAIN)_map.%, $(GEN_MAP_EXTS)) \
 		  $(patsubst %, $(MAIN)_%, bitgen.xwbt ngdbuild.xrpt pad.csv pad.txt summary.xml usage.xml xst.xrpt) \
+		  $(XAW_VHDLS) \
+		  $(patsubst %, $(GENSRCDIR)/%_arwz.ucf, $(XAW_MODS)) \
 		  $(TOP).lso $(TOP)_map.xrpt $(TOP)_par.xrpt \
-		  usage_statistics_webtalk.html webtalk.log
+		  usage_statistics_webtalk.html webtalk.log xaw2vhdl.log
 
 XILINX_ROOT	= $(HOME)/prog/fpga/Xilinx/14.2/ISE_DS/ISE/bin/lin64
 PAPILIO_PROG	= $(HOME)/bin/papilio-prog
@@ -33,7 +37,7 @@ clean:
 	rm -f $(GENS)
 	rm -rf _xmsgs ngo $(wildcard xlnx_auto_*_xdb) xst
 
-$(GEN_VHDLS): $(HS_SRCS)
+$(LAVA_VHDLS): $(HS_SRCS)
 	$(RUNGHC) -i$(LAVADIR) $(LAVADIR)/$(TOP).hs
 
 $(MAIN).prj: Makefile
@@ -41,6 +45,9 @@ $(MAIN).prj: Makefile
 
 $(MAIN).xst: Makefile xst.in
 	sed -e 's/@MAIN@/$(MAIN)/g;s/@TOP@/$(TOP)/g;' < xst.in > $@
+
+gensrc/%.vhdl: ipcore_dir/%.xaw
+	$(XILINX_ROOT)/xaw2vhdl $< -st XST $@
 
 $(MAIN).ut: Makefile ut.in
 	sed -e '' < ut.in > $@
