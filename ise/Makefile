@@ -1,12 +1,12 @@
 MAIN		= Video
 TOP		= Video
-VHDL_MODS	=
+VHDL_MODS	= dcm
 XAW_MODS	= dcm_32_to_50p35
 HS_MODS		=
 
 LAVADIR		= ../src
 HS_SRCS		= $(patsubst %, $(LAVADIR)/%.hs, $(HS_MODS) $(TOP))
-SRCDIR		= src
+SRCDIR		= $(LAVADIR)/vhdl
 GENSRCDIR	= gensrc
 FPGA		= XC3S500E-VQ100-4
 XSTDIR		= xst

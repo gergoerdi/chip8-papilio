@@ -17,12 +17,21 @@ import System.Directory
 testBench :: (Arcade fabric) => fabric ()
 testBench = do
     Buttons{..} <- buttons
-    leds $ matrix [buttonUp, buttonDown, buttonLeft, buttonRight]
+    let (_, buttonUp', _) = debounce (Witness :: Witness X16) buttonUp
+    let (_, buttonDown', _) = debounce (Witness :: Witness X16) buttonDown
+
+    let counter = runRTL $ do
+            counter <- newReg (0 :: U4)
+            WHEN buttonUp' $ counter := reg counter + 1
+            WHEN buttonDown' $ counter := reg counter - 1
+            return $ reg counter
+
+    leds (fromUnsigned counter)
 
 emitBench :: IO ()
 emitBench = do
     kleg <- reifyFabric $ do
-        board_init
+        theClk "CLK_50MHZ"
         testBench
 
     createDirectoryIfMissing True outPath
