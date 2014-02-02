@@ -1,6 +1,7 @@
 MAIN		= Video
 TOP		= Video
 VHDL_MODS	=
+XAW_MODS	= dcm_32_to_50p35
 HS_MODS		=
 
 LAVADIR		= ../src
@@ -25,7 +26,9 @@ GENS		= $(LAVA_VHDLS) \
 		  $(XAW_VHDLS) \
 		  $(patsubst %, $(GENSRCDIR)/%_arwz.ucf, $(XAW_MODS)) \
 		  $(TOP).lso $(TOP)_map.xrpt $(TOP)_par.xrpt \
-		  usage_statistics_webtalk.html webtalk.log xaw2vhdl.log
+		  $(TOP)_summary.html $(TOP)_envsettings.html \
+		  usage_statistics_webtalk.html webtalk.log xaw2vhdl.log webtalk_pn.xml \
+		  arwz.log
 
 XILINX_ROOT	= $(HOME)/prog/fpga/Xilinx/14.2/ISE_DS/ISE/bin/lin64
 PAPILIO_PROG	= $(HOME)/bin/papilio-prog

@@ -1,5 +1,6 @@
 gensrc
 
+*.log
 *.bgn
 *.bit
 *.bld
@@ -38,6 +39,7 @@ usage_statistics_webtalk.html
 *_summary.xml
 *_summary.html
 *_usage.xml
+*_envsettings.html
 
 *.xreport
 webtalk*
