@@ -15,6 +15,7 @@ UCF		= $(patsubst %, $(GENSRCDIR)/%.ucf, $(MAIN))
 LAVA_VHDLS	= $(patsubst %, $(GENSRCDIR)/%.vhdl, lava-prelude $(MAIN))
 XAW_VHDLS	= $(patsubst %, $(GENSRCDIR)/%.vhdl, $(XAW_MODS))
 VHDL_SRCS	= $(patsubst %, $(SRCDIR)/%.vhdl, $(VHDL_MODS))
+XAW_SRCS	= $(patsubst %, ipcore_dir/%.xaw, $(XAW_MODS))
 VHDLS		= $(LAVA_VHDLS) $(XAW_VHDLS) $(VHDL_SRCS)
 
 GEN_EXTS	= bgn bit bld drc ncd ngc ngd ngr pad par pcf ptwx syr unroutes ut xpi xst prj
@@ -39,6 +40,13 @@ all: $(MAIN).bit
 clean:
 	rm -f $(GENS)
 	rm -rf _xmsgs ngo $(wildcard xlnx_auto_*_xdb) xst
+
+$(MAIN).xise: Makefile xise.in
+	sed xise.in -e 's%@@FILES@@%\
+		$(foreach FILENAME, $(VHDL_SRCS) $(LAVA_VHDLS), <file xil_pn:name="$(FILENAME)" xil_pn:type="FILE_VHDL">\n<association xil_pn:name="BehavioralSimulation" />\n<association xil_pn:name="Implementation" />\n</file>\n) \
+		$(foreach FILENAME, $(UCF), <file xil_pn:name="$(FILENAME)" xil_pn:type="FILE_UCF">\n<association xil_pn:name="Implementation" />\n</file>\n) \
+		$(foreach FILENAME, $(XAW_SRCS), <file xil_pn:name="$(FILENAME)" xil_pn:type="FILE_XAW">\n<association xil_pn:name="BehavioralSimulation" />\n<association xil_pn:name="Implementation" />\n</file>\n)%' > $@
+
 
 $(LAVA_VHDLS): $(HS_SRCS)
 	$(RUNGHC) -i$(LAVADIR) $(LAVADIR)/$(TOP).hs

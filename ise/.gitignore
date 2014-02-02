@@ -1,5 +1,9 @@
 gensrc
 
+iseconfig
+*.xise
+*.gise
+
 *.log
 *.bgn
 *.bit
