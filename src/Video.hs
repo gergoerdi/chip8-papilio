@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RecordWildCards #-}
 import Utils
@@ -14,48 +15,83 @@ import qualified Data.Sized.Matrix as Matrix
 import Data.Sized.Unsigned as Unsigned
 import Data.Sized.Ix
 import Control.Monad (liftM)
+import Data.Bits
 
 import System.FilePath
 import System.Directory
 
-video :: VideoIn -> VideoOut
-video VideoIn{..} = runRTL $ do
-    fbAddr <- newReg (0, 0)
-    let vidFrameBufferA = reg fbAddr
-    return VideoOut{..}
--}
+type VidX = U6
+type VidY = U5
+type PixData = Bool
 
-vgaFB :: Signal CLK Bool
-      -> Signal CLK Bool -> Signal CLK Bool -> Signal CLK Bool
-      -> VGA CLK X4 X4 X4
-vgaFB reset r g b = vgaOut
+type FrameBuffer = (VidX, VidY) -> PixData
+
+vgaFB :: forall clk. (Clock clk)
+      => Signal clk Bool
+      -> Signal clk FrameBuffer
+      -> VGA clk X4 X4 X4
+vgaFB reset fb = vgaOut
   where
     VGADriverOut{..} = driveVGA VGADriverIn{..}
 
     vgaInReset = reset
-    vgaInR = mux inField (pureS 0, binarize r)
-    vgaInG = mux inField (pureS 0, binarize g)
-    vgaInB = mux inField (pureS 0, binarize b)
+    vgaInR = mux inField (pureS 0, r)
+    vgaInG = mux inField (pureS 0, g)
+    vgaInB = mux inField (pureS 0, b)
 
-    inField = isEnabled vgaOutY .&&.
-              enabledVal vgaOutY `betweenCO` (80, 400)
+    (validX, rawX) = unpackEnabled vgaOutX
+    (validY, rawY) = unpackEnabled vgaOutY
 
-    binarize s = mux s (pureS minBound, pureS maxBound)
+    inFieldH = validX .&&. rawX `betweenCO` (64, 576)
+    inFieldV = validY .&&. rawY `betweenCO` (112, 368)
+    inField = inFieldH .&&. inFieldV
+    -- inField = validY .&&. rawY `betweenCO` (80, 400)
+
+    pos :: Signal clk (VidX, VidY)
+    pos = pack (signed $ (rawX - 64) `shiftR` 3, signed $ (rawY - 112) `shiftR` 3)
+
+    pixel = syncRead fb pos
+
+    r = spread pixel
+    g = spread pixel
+    b = spread pixel
+
+    spread s = mux s (minBound, maxBound)
 
 testBench :: (Arcade fabric) => fabric ()
 testBench = do
     Buttons{..} <- buttons
     (_, reset, _) <- debounce (Witness :: Witness X16) `liftM` resetButton
-    let (_, buttonR, _) = debounce (Witness :: Witness X16) buttonLeft
-    let (_, buttonG, _) = debounce (Witness :: Witness X16) buttonUp
-    let (_, buttonB, _) = debounce (Witness :: Witness X16) buttonRight
 
-    let r = toggle buttonR
-        g = toggle buttonG
-        b = toggle buttonB
+    -- let (_, buttonUp, _) = debounce (Witness :: Witness X16) buttonUp
+    -- let (_, buttonDown, _) = debounce (Witness :: Witness X16) buttonDown
+    -- let (_, buttonLeft, _) = debounce (Witness :: Witness X16) buttonLeft
+    -- let (_, buttonRight, _) = debounce (Witness :: Witness X16) buttonRight
 
-    leds $ matrix [reset, r, g, b]
-    vga . encodeVGA $ vgaFB reset r g b
+    -- let r = toggle buttonR
+    --     g = toggle buttonG
+    --     b = toggle buttonB
+
+    leds $ matrix [reset, low, low, low]
+
+    let fb = runRTL $ do
+            x <- newReg minBound
+            y <- newReg minBound
+            filled <- newReg False
+            let filling = bitNot $ reg filled
+
+            let fbA = pack (reg x, reg y)
+
+            WHEN filling $ do
+                -- x := reg x + 1
+                x := 0
+                y := reg y + 1
+                WHEN (reg y .==. maxBound) $ do
+                    filled := high
+
+            return $ writeMemory $ packEnabled filling $ pack (fbA, high)
+
+    vga . encodeVGA $ vgaFB reset fb
   where
     toggle btn = runRTL $ do
         buf <- newReg False
