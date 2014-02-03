@@ -5,6 +5,8 @@ module VGA640x480
        , driveVGA
        ) where
 
+import Utils
+
 import Language.KansasLava
 import Language.KansasLava.Signal.Utils
 import Hardware.KansasLava.VGA as VGA
@@ -85,6 +87,3 @@ driveVGA VGADriverIn{..} = runRTL $ do
     vSyncEnd = vSyncStart + vSync
     vPost = 33
     vMax = sum [vSize, vPre, vSync, vPost] - 1
-
-betweenCO :: (Ord a, Rep a) => Signal clk a -> (a, a) -> Signal clk Bool
-x `betweenCO` (lo, hi) = pureS lo .<=. x .&&. x .<. pureS hi

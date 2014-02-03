@@ -1,5 +1,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RecordWildCards #-}
+import Utils
+
 import Language.KansasLava
 import Language.KansasLava.Signal.Utils
 import Hardware.KansasLava.Boards.Papilio
@@ -31,17 +33,19 @@ vgaFB reset r g b = vgaOut
     VGADriverOut{..} = driveVGA VGADriverIn{..}
 
     vgaInReset = reset
-    vgaInR = binarize r
-    vgaInG = binarize g
-    vgaInB = binarize b
+    vgaInR = mux inField (pureS 0, binarize r)
+    vgaInG = mux inField (pureS 0, binarize g)
+    vgaInB = mux inField (pureS 0, binarize b)
+
+    inField = isEnabled vgaOutY .&&.
+              enabledVal vgaOutY `betweenCO` (80, 400)
 
     binarize s = mux s (pureS minBound, pureS maxBound)
 
 testBench :: (Arcade fabric) => fabric ()
 testBench = do
     Buttons{..} <- buttons
-    -- (_, reset, _) <- debounce (Witness :: Witness X16) `liftM` resetButton
-    reset <- resetButton
+    (_, reset, _) <- debounce (Witness :: Witness X16) `liftM` resetButton
     let (_, buttonR, _) = debounce (Witness :: Witness X16) buttonLeft
     let (_, buttonG, _) = debounce (Witness :: Witness X16) buttonUp
     let (_, buttonB, _) = debounce (Witness :: Witness X16) buttonRight
