@@ -10,7 +10,7 @@ entity main is
     BTN_LEFT : in std_logic;
     BTN_RIGHT : in std_logic;
     BTN_RESET : in std_logic;
-    LED : out std_logic_vector(3 downto 0);
+    --LED : out std_logic_vector(3 downto 0);
     VGA_VSYNC : out std_logic;
     VGA_HSYNC : out std_logic;
     VGA_R : out std_logic_vector(3 downto 0);
@@ -36,7 +36,7 @@ architecture arch of main is
          BTN_LEFT : in std_logic;
          BTN_RIGHT : in std_logic;
          BTN_RESET : in std_logic;
-         LED : out std_logic_vector(3 downto 0);
+         --LED : out std_logic_vector(3 downto 0);
          VGA_VSYNC : out std_logic;
          VGA_HSYNC : out std_logic;
          VGA_R : out std_logic_vector(3 downto 0);
@@ -60,7 +60,7 @@ begin
       BTN_LEFT => BTN_LEFT,
       BTN_RIGHT => BTN_RIGHT,
       BTN_RESET => BTN_RESET,
-      LED => LED,
+      --LED => LED,
       VGA_VSYNC => VGA_VSYNC,
       VGA_HSYNC => VGA_HSYNC,
       VGA_R => VGA_R,

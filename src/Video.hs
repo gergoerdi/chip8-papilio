@@ -59,8 +59,10 @@ vgaFB reset fb = vgaOut
 
     pixel = syncRead fb (nextPair pos)
 
-    r = mux (x .==. 0) (spread pixel, 0)
-    g = mux (x .==. 1) (spread pixel, 0)
+    -- r = mux (x .==. 0) (spread pixel, 0)
+    -- g = mux (x .==. 1) (spread pixel, 0)
+    r = spread pixel
+    g = spread pixel
     b = spread pixel
 
     spread s = mux s (minBound, maxBound)
@@ -93,18 +95,26 @@ testBench = do
     Buttons{..} <- buttons
     (_, reset, _) <- debounce (Witness :: Witness X16) `liftM` resetButton
 
-    -- let (_, buttonUp, _) = debounce (Witness :: Witness X16) buttonUp
-    -- let (_, buttonDown, _) = debounce (Witness :: Witness X16) buttonDown
-    -- let (_, buttonLeft, _) = debounce (Witness :: Witness X16) buttonLeft
-    -- let (_, buttonRight, _) = debounce (Witness :: Witness X16) buttonRight
+    let (_, buttonUp', _) = debounce (Witness :: Witness X16) buttonUp
+    let (_, buttonDown', _) = debounce (Witness :: Witness X16) buttonDown
+    let (_, buttonLeft', _) = debounce (Witness :: Witness X16) buttonLeft
+    let (_, buttonRight', _) = debounce (Witness :: Witness X16) buttonRight
 
-    -- let r = toggle buttonR
-    --     g = toggle buttonG
-    --     b = toggle buttonB
+    let (we, cursor) = runRTL $ do
+            x <- newReg 0
+            y <- newReg 0
 
-    leds $ matrix [reset, low, low, low]
+            WHEN buttonUp' $ y := reg y - 1
+            WHEN buttonDown' $ y := reg y + 1
+            WHEN buttonLeft' $ x := reg x - 1
+            WHEN buttonRight' $ x := reg x + 1
 
-    let fb = ramWithInit nextPair (rom `flip` initImage) disabledS
+            let anyButton = buttonUp' .||. buttonDown' .||. buttonLeft' .||. buttonRight'
+            return (anyButton, pack (reg x, reg y))
+
+    let fb = ramWithInit nextPair (rom `flip` initImage) $ packEnabled we $ pack (cursor, d)
+        d = bitNot $ syncRead fb cursor
+
     vga . encodeVGA $ vgaFB reset fb
   where
     toggle btn = runRTL $ do
@@ -112,7 +122,7 @@ testBench = do
         WHEN btn $ buf := bitNot (reg buf)
         return $ reg buf
 
-    initImage (x, y) = Just $ x `elem` [minBound, 1, maxBound] || y `elem` [minBound, maxBound] || fromIntegral x == fromIntegral y
+    initImage (x, y) = Just $ x `elem` [minBound, maxBound] || y `elem` [minBound, maxBound] || fromIntegral x == fromIntegral y
 
 emitBench :: IO ()
 emitBench = do
