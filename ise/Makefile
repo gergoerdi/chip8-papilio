@@ -1,14 +1,14 @@
 MAIN		= Video
-TOP		= Video
-VHDL_MODS	= dcm
+TOP		= main
+VHDL_MODS	= dcm main
 XAW_MODS	= dcm_32_to_50p35
-HS_MODS		=
+HS_MODS		= VGA640x480
 
 LAVADIR		= ../src
-HS_SRCS		= $(patsubst %, $(LAVADIR)/%.hs, $(HS_MODS) $(TOP))
+HS_SRCS		= $(patsubst %, $(LAVADIR)/%.hs, $(HS_MODS) $(MAIN))
 SRCDIR		= $(LAVADIR)/vhdl
 GENSRCDIR	= gensrc
-FPGA		= XC3S500E-VQ100-4
+FPGA		= XC3S500E-VQ100-5
 XSTDIR		= xst
 
 UCF		= $(patsubst %, $(GENSRCDIR)/%.ucf, $(MAIN))
@@ -49,7 +49,7 @@ $(MAIN).xise: Makefile xise.in
 
 
 $(LAVA_VHDLS): $(HS_SRCS)
-	$(RUNGHC) -i$(LAVADIR) $(LAVADIR)/$(TOP).hs
+	$(RUNGHC) -i$(LAVADIR) $(LAVADIR)/$(MAIN).hs
 
 $(MAIN).prj: Makefile
 	echo $(foreach VHDL_SRC,$(VHDLS),'vhdl work "$(VHDL_SRC)"\n') > $@

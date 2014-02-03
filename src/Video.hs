@@ -5,28 +5,58 @@ import Language.KansasLava.Signal.Utils
 import Hardware.KansasLava.Boards.Papilio
 import Hardware.KansasLava.Boards.Papilio.Arcade
 import Hardware.KansasLava.VGA
+import VGA640x480
 
 import Data.Sized.Matrix (Matrix, matrix)
 import qualified Data.Sized.Matrix as Matrix
 import Data.Sized.Unsigned as Unsigned
 import Data.Sized.Ix
+import Control.Monad (liftM)
 
 import System.FilePath
 import System.Directory
 
+video :: VideoIn -> VideoOut
+video VideoIn{..} = runRTL $ do
+    fbAddr <- newReg (0, 0)
+    let vidFrameBufferA = reg fbAddr
+    return VideoOut{..}
+-}
+
+vgaFB :: Signal CLK Bool
+      -> Signal CLK Bool -> Signal CLK Bool -> Signal CLK Bool
+      -> VGA CLK X4 X4 X4
+vgaFB reset r g b = vgaOut
+  where
+    VGADriverOut{..} = driveVGA VGADriverIn{..}
+
+    vgaInReset = reset
+    vgaInR = binarize r
+    vgaInG = binarize g
+    vgaInB = binarize b
+
+    binarize s = mux s (pureS minBound, pureS maxBound)
+
 testBench :: (Arcade fabric) => fabric ()
 testBench = do
     Buttons{..} <- buttons
-    let (_, buttonUp', _) = debounce (Witness :: Witness X16) buttonUp
-    let (_, buttonDown', _) = debounce (Witness :: Witness X16) buttonDown
+    -- (_, reset, _) <- debounce (Witness :: Witness X16) `liftM` resetButton
+    reset <- resetButton
+    let (_, buttonR, _) = debounce (Witness :: Witness X16) buttonLeft
+    let (_, buttonG, _) = debounce (Witness :: Witness X16) buttonUp
+    let (_, buttonB, _) = debounce (Witness :: Witness X16) buttonRight
 
-    let counter = runRTL $ do
-            counter <- newReg (0 :: U4)
-            WHEN buttonUp' $ counter := reg counter + 1
-            WHEN buttonDown' $ counter := reg counter - 1
-            return $ reg counter
+    let r = toggle buttonR
+        g = toggle buttonG
+        b = toggle buttonB
 
-    leds (fromUnsigned counter)
+    leds $ matrix [reset, r, g, b]
+    vga . encodeVGA $ vgaFB reset r g b
+  where
+    toggle btn = runRTL $ do
+        buf <- newReg False
+        WHEN btn $ buf := bitNot (reg buf)
+        return $ reg buf
 
 emitBench :: IO ()
 emitBench = do
