@@ -1,6 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE FlexibleInstances #-}
 import Utils
 
 import Language.KansasLava
@@ -26,6 +26,11 @@ type PixData = Bool
 
 type FrameBuffer = (VidX, VidY) -> PixData
 
+nextPair xy = mux (x .==. maxBound) (pack (x + 1, y), pack (0, y + 1))
+  where
+    (x, y) = unpack xy
+    nextRow = x .==. maxBound
+
 vgaFB :: forall clk. (Clock clk)
       => Signal clk Bool
       -> Signal clk FrameBuffer
@@ -45,18 +50,43 @@ vgaFB reset fb = vgaOut
     inFieldH = validX .&&. rawX `betweenCO` (64, 576)
     inFieldV = validY .&&. rawY `betweenCO` (112, 368)
     inField = inFieldH .&&. inFieldV
-    -- inField = validY .&&. rawY `betweenCO` (80, 400)
+
+    x = signed $ (rawX - 64) `shiftR` 3
+    y = signed $ (rawY - 112) `shiftR` 3
 
     pos :: Signal clk (VidX, VidY)
-    pos = pack (signed $ (rawX - 64) `shiftR` 3, signed $ (rawY - 112) `shiftR` 3)
+    pos = pack (x, y)
 
-    pixel = syncRead fb pos
+    pixel = syncRead fb (nextPair pos)
 
-    r = spread pixel
-    g = spread pixel
+    r = mux (x .==. 0) (spread pixel, 0)
+    g = mux (x .==. 1) (spread pixel, 0)
     b = spread pixel
 
     spread s = mux s (minBound, maxBound)
+
+ramWithInit :: (Clock clk, Size a, Eq a, Rep a, Bounded a, Rep d)
+            => (Signal clk a -> Signal clk a)
+            -> (Signal clk a -> Signal clk d)
+            -> Signal clk (Pipe a d)
+            -> Signal clk (a -> d)
+ramWithInit next rom pipe = runRTL $ do
+    x <- newReg minBound
+    filled <- newReg False
+    let filling = bitNot $ reg filled
+
+    WHEN filling $ do
+        x := next (reg x)
+        WHEN (reg x .==. maxBound) $ do
+            filled := high
+
+    let (we, ad) = unpack pipe
+        we' = filling .||. we
+        (a, d) = unpack ad
+        a' = mux filling (a, reg x)
+        d' = mux filling (d, rom (reg x))
+
+    return $ writeMemory $ packEnabled we' $ pack (a', d')
 
 testBench :: (Arcade fabric) => fabric ()
 testBench = do
@@ -74,29 +104,15 @@ testBench = do
 
     leds $ matrix [reset, low, low, low]
 
-    let fb = runRTL $ do
-            x <- newReg minBound
-            y <- newReg minBound
-            filled <- newReg False
-            let filling = bitNot $ reg filled
-
-            let fbA = pack (reg x, reg y)
-
-            WHEN filling $ do
-                -- x := reg x + 1
-                x := 0
-                y := reg y + 1
-                WHEN (reg y .==. maxBound) $ do
-                    filled := high
-
-            return $ writeMemory $ packEnabled filling $ pack (fbA, high)
-
+    let fb = ramWithInit nextPair (rom `flip` initImage) disabledS
     vga . encodeVGA $ vgaFB reset fb
   where
     toggle btn = runRTL $ do
         buf <- newReg False
         WHEN btn $ buf := bitNot (reg buf)
         return $ reg buf
+
+    initImage (x, y) = Just $ x `elem` [minBound, 1, maxBound] || y `elem` [minBound, maxBound] || fromIntegral x == fromIntegral y
 
 emitBench :: IO ()
 emitBench = do
