@@ -8,7 +8,7 @@ import Language.KansasLava.Signal.Utils
 import Hardware.KansasLava.Boards.Papilio
 import Hardware.KansasLava.Boards.Papilio.Arcade
 import Hardware.KansasLava.VGA
-import VGA640x480
+import VGADriver
 
 import Data.Sized.Matrix (Matrix, matrix)
 import qualified Data.Sized.Matrix as Matrix
@@ -37,7 +37,7 @@ vgaFB :: forall clk. (Clock clk)
       -> VGA clk X4 X4 X4
 vgaFB reset fb = vgaOut
   where
-    VGADriverOut{..} = driveVGA VGADriverIn{..}
+    VGADriverOut{..} = driveVGA vga640x480 VGADriverIn{..}
 
     vgaInReset = reset
     vgaInR = mux inField (pureS 0, r)

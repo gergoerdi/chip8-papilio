@@ -1,9 +1,14 @@
 {-# LANGUAGE RecordWildCards #-}
-module VGA640x480
-       ( VGADriverIn(..)
+module VGADriver
+       ( VGAParams(..)
+       , VGATiming(..)
+       , VGADriverIn(..)
        , VGADriverOut(..)
        , driveVGA
+       , vga640x480
        ) where
+
+-- TODO: Move this whole module to Hardware.KansasLava.VGA.Driver
 
 import Utils
 
@@ -21,19 +26,28 @@ data VGADriverIn clk r g b = VGADriverIn
                              , vgaInB :: Signal clk (Unsigned b)
                              }
 
-data VGADriverOut clk r g b = VGADriverOut
-                              { vgaOut :: VGA clk r g b
-                              , vgaOutClkPhase :: Signal clk Bool
-                              , vgaOutX :: Signal clk (Enabled U10)
-                              , vgaOutY :: Signal clk (Enabled U10)
-                              }
+data VGADriverOut clk w h r g b = VGADriverOut
+                                  { vgaOut :: VGA clk r g b
+                                  -- , vgaOutClkPhase :: Signal clk Bool
+                                  , vgaOutX :: Signal clk (Enabled (Unsigned w))
+                                  , vgaOutY :: Signal clk (Enabled (Unsigned h))
+                                  }
 
-driveVGA :: (Clock clk, Size r, Size g, Size b)
-         => VGADriverIn clk r g b -> VGADriverOut clk r g b
-driveVGA VGADriverIn{..} = runRTL $ do
+data VGAParams w h = VGAParams
+                     { vgaHorizTiming :: VGATiming w
+                     , vgaVertTiming :: VGATiming h
+                     }
+
+data VGATiming a = VGATiming{ visibleSize, pre, syncPulse, post :: Unsigned a }
+
+driveVGA :: (Clock clk, Size r, Size g, Size b, Size w, Size h)
+         => VGAParams w h
+         -> VGADriverIn clk r g b
+         -> VGADriverOut clk w h r g b
+driveVGA VGAParams{..} VGADriverIn{..} = runRTL $ do
     phase <- newReg False
-    hCount <- newReg (0 :: U10)
-    vCount <- newReg (0 :: U10)
+    hCount <- newReg 0
+    vCount <- newReg 0
 
     let hEnd = reg hCount .==. pureS hMax
         vEnd = reg vCount .==. pureS vMax
@@ -45,6 +59,7 @@ driveVGA VGADriverIn{..} = runRTL $ do
              vCount := 0
       , OTHERWISE $ do
              phase := bitNot (reg phase)
+
              WHEN (reg phase) $ do
                  hCount := mux hEnd (reg hCount + 1, 0)
                  WHEN hEnd $ do
@@ -72,18 +87,23 @@ driveVGA VGADriverIn{..} = runRTL $ do
 
     return VGADriverOut{..}
   where
-    hSize = 640 :: U10
-    hPre = 16
-    hSync = 96
+    hSize = visibleSize vgaHorizTiming
+    hPre = pre vgaHorizTiming
+    hSync = syncPulse vgaHorizTiming
     hSyncStart = hSize + hPre
     hSyncEnd = hSyncStart + hSync
-    hPost = 48
+    hPost = post vgaHorizTiming
     hMax = sum [hSize, hPre, hSync, hPost] - 1
 
-    vSize = 480 :: U10
-    vPre = 10
-    vSync = 2
+    vSize = visibleSize vgaVertTiming
+    vPre = pre vgaVertTiming
+    vSync = syncPulse vgaVertTiming
     vSyncStart = vSize + vPre
     vSyncEnd = vSyncStart + vSync
-    vPost = 33
+    vPost = post vgaVertTiming
     vMax = sum [vSize, vPre, vSync, vPost] - 1
+
+vga640x480 :: VGAParams X10 X10
+vga640x480 = VGAParams{ vgaHorizTiming = VGATiming 640 16 96 48
+                      , vgaVertTiming  = VGATiming 480 16  2 33
+                      }
