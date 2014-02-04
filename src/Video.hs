@@ -31,39 +31,60 @@ nextPair xy = pack (x + 1, mux nextRow (y, y + 1))
     (x, y) = unpack xy
     nextRow = x .==. maxBound
 
+drive64x32 :: (Clock clk)
+           => VGADriverIn clk Bool () () -> VGADriverOut clk X6 X5 U4 U4 U4
+drive64x32 VGADriverIn{..} = VGADriverOut{ vgaOut = vgaOut
+                                         , vgaOutX = x'
+                                         , vgaOutY = y' }
+  where
+    VGADriverOut{..} = driveVGA vga640x480 vgaDriverIn'
+    vgaDriverIn' = VGADriverIn{ vgaInReset = vgaInReset
+                              , vgaInR = r'
+                              , vgaInG = g'
+                              , vgaInB = b'
+                              }
+
+    r' = mux inField (pureS 0, r)
+    g' = mux inField (pureS 0, g)
+    b' = mux inField (pureS 0, b)
+
+    (validX, x) = unpackEnabled vgaOutX
+    (validY, y) = unpackEnabled vgaOutY
+
+    inFieldH = validX .&&. x `betweenCO` (64, 576)
+    inFieldV = validY .&&. y `betweenCO` (112, 368)
+    inField = inFieldH .&&. inFieldV
+
+    x' = mapEnabled (\x -> signed $ (x - 64) `shiftR` 3) vgaOutX
+    y' = mapEnabled (\y -> signed $ (y - 112) `shiftR` 3) vgaOutY
+
+    pixel = bitwise vgaInR
+    r = spread pixel
+    g = spread pixel
+    b = spread pixel
+
+    spread s = mux s (minBound, maxBound)
+
 vgaFB :: forall clk. (Clock clk)
       => Signal clk Bool
       -> Signal clk FrameBuffer
-      -> VGA clk X4 X4 X4
+      -> VGA clk U4 U4 U4
 vgaFB reset fb = vgaOut
   where
-    VGADriverOut{..} = driveVGA vga640x480 VGADriverIn{..}
+    VGADriverOut{..} = drive64x32 VGADriverIn{..}
 
     vgaInReset = reset
-    vgaInR = mux inField (pureS 0, r)
-    vgaInG = mux inField (pureS 0, g)
-    vgaInB = mux inField (pureS 0, b)
+    vgaInR = bitwise pixel
+    vgaInG = pureS ()
+    vgaInB = pureS ()
 
-    (validX, rawX) = unpackEnabled vgaOutX
-    (validY, rawY) = unpackEnabled vgaOutY
-
-    inFieldH = validX .&&. rawX `betweenCO` (64, 576)
-    inFieldV = validY .&&. rawY `betweenCO` (112, 368)
-    inField = inFieldH .&&. inFieldV
-
-    x = signed $ (rawX - 64) `shiftR` 3
-    y = signed $ (rawY - 112) `shiftR` 3
+    x = enabledVal vgaOutX
+    y = enabledVal vgaOutY
 
     pos :: Signal clk (VidX, VidY)
     pos = pack (x, y)
 
     pixel = syncRead fb pos
-
-    r = mux pixel (0, signed (x `shiftR` 2))
-    g = mux pixel (0, signed (y `shiftR` 1))
-    b = spread pixel
-
-    spread s = mux s (minBound, maxBound)
 
 testBench :: (Arcade fabric) => fabric ()
 testBench = do
