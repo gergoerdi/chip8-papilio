@@ -57,12 +57,10 @@ vgaFB reset fb = vgaOut
     pos :: Signal clk (VidX, VidY)
     pos = pack (x, y)
 
-    pixel = syncRead fb (nextPair pos)
+    pixel = syncRead fb pos
 
-    -- r = mux (x .==. 0) (spread pixel, 0)
-    -- g = mux (x .==. 1) (spread pixel, 0)
-    r = spread pixel
-    g = spread pixel
+    r = mux pixel (0, signed (x `shiftR` 2))
+    g = mux pixel (0, signed (y `shiftR` 1))
     b = spread pixel
 
     spread s = mux s (minBound, maxBound)
@@ -77,20 +75,42 @@ testBench = do
     let (_, buttonLeft', _) = debounce (Witness :: Witness X16) buttonLeft
     let (_, buttonRight', _) = debounce (Witness :: Witness X16) buttonRight
 
-    let (we, cursor) = runRTL $ do
+    let writeFB = runRTL $ do
             x <- newReg 0
             y <- newReg 0
-
-            WHEN buttonUp' $ y := reg y - 1
-            WHEN buttonDown' $ y := reg y + 1
-            WHEN buttonLeft' $ x := reg x - 1
-            WHEN buttonRight' $ x := reg x + 1
-
+            let cursor = pack (reg x, reg y)
             let anyButton = buttonUp' .||. buttonDown' .||. buttonLeft' .||. buttonRight'
-            return (anyButton, pack (reg x, reg y))
 
-    let fb = ramWithInit nextPair (rom `flip` initImage) $ packEnabled we $ pack (cursor, d)
-        d = bitNot $ syncRead fb cursor
+            fetching <- newReg False
+            waiting <- newReg False
+            we <- newReg False
+            d <- newReg True
+
+            CASE [ IF (reg fetching) $ do
+                        fetching := low
+                        waiting := high
+                 , IF (reg waiting) $ do
+                        we := high
+                        waiting := low
+                        d := bitNot $ syncRead fb cursor
+                 , OTHERWISE $ do
+                        we := low
+
+                        let dy1 = mux buttonUp' (0, -1)
+                            dy2 = mux buttonDown' (0, 1)
+                            dy = dy1 + dy2
+
+                            dx1 = mux buttonLeft' (0, -1)
+                            dx2 = mux buttonRight' (0, 1)
+                            dx = dx1 + dx2
+
+                        x := reg x + dx
+                        y := reg y + dy
+                        fetching := anyButton
+                 ]
+
+            return $ packEnabled (reg we) $ pack (cursor, reg d)
+        fb = ramWithInit nextPair (rom `flip` initImage) writeFB
 
     vga . encodeVGA $ vgaFB reset fb
   where
@@ -99,7 +119,8 @@ testBench = do
         WHEN btn $ buf := bitNot (reg buf)
         return $ reg buf
 
-    initImage (x, y) = Just $ x `elem` [minBound, maxBound] || y `elem` [minBound, maxBound] || fromIntegral x == fromIntegral y
+    initImage (x, y) = Just $ x `elem` [minBound, maxBound]
+                            || y `elem` [minBound, maxBound]
 
 emitBench :: IO ()
 emitBench = do
