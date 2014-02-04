@@ -26,7 +26,7 @@ type PixData = Bool
 
 type FrameBuffer = (VidX, VidY) -> PixData
 
-nextPair xy = mux (x .==. maxBound) (pack (x + 1, y), pack (0, y + 1))
+nextPair xy = pack (x + 1, mux nextRow (y, y + 1))
   where
     (x, y) = unpack xy
     nextRow = x .==. maxBound
