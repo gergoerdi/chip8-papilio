@@ -67,29 +67,6 @@ vgaFB reset fb = vgaOut
 
     spread s = mux s (minBound, maxBound)
 
-ramWithInit :: (Clock clk, Size a, Eq a, Rep a, Bounded a, Rep d)
-            => (Signal clk a -> Signal clk a)
-            -> (Signal clk a -> Signal clk d)
-            -> Signal clk (Pipe a d)
-            -> Signal clk (a -> d)
-ramWithInit next rom pipe = runRTL $ do
-    x <- newReg minBound
-    filled <- newReg False
-    let filling = bitNot $ reg filled
-
-    WHEN filling $ do
-        x := next (reg x)
-        WHEN (reg x .==. maxBound) $ do
-            filled := high
-
-    let (we, ad) = unpack pipe
-        we' = filling .||. we
-        (a, d) = unpack ad
-        a' = mux filling (a, reg x)
-        d' = mux filling (d, rom (reg x))
-
-    return $ writeMemory $ packEnabled we' $ pack (a', d')
-
 testBench :: (Arcade fabric) => fabric ()
 testBench = do
     Buttons{..} <- buttons
