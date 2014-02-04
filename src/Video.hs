@@ -26,6 +26,9 @@ type PixData = Bool
 
 type FrameBuffer = (VidX, VidY) -> PixData
 
+nextPair :: (Size a, Size b)
+         => Signal clk (Unsigned a, Unsigned b)
+         -> Signal clk (Unsigned a, Unsigned b)
 nextPair xy = pack (x + 1, mux nextRow (y, y + 1))
   where
     (x, y) = unpack xy
@@ -39,14 +42,10 @@ drive64x32 VGADriverIn{..} = VGADriverOut{ vgaOut = vgaOut
   where
     VGADriverOut{..} = driveVGA vga640x480 vgaDriverIn'
     vgaDriverIn' = VGADriverIn{ vgaInReset = vgaInReset
-                              , vgaInR = r'
-                              , vgaInG = g'
-                              , vgaInB = b'
+                              , vgaInR = r
+                              , vgaInG = g
+                              , vgaInB = b
                               }
-
-    r' = mux inField (pureS 0, r)
-    g' = mux inField (pureS 0, g)
-    b' = mux inField (pureS 0, b)
 
     (validX, x) = unpackEnabled vgaOutX
     (validY, y) = unpackEnabled vgaOutY
@@ -63,7 +62,7 @@ drive64x32 VGADriverIn{..} = VGADriverOut{ vgaOut = vgaOut
     g = spread pixel
     b = spread pixel
 
-    spread s = mux s (minBound, maxBound)
+    spread s = mux (s .&&. inField) (minBound, maxBound)
 
 vgaFB :: forall clk. (Clock clk)
       => Signal clk Bool
