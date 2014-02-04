@@ -21,9 +21,9 @@ import Data.Sized.Ix
 
 data VGADriverIn clk r g b = VGADriverIn
                              { vgaInReset :: Signal clk Bool
-                             , vgaInR :: Signal clk (Unsigned r)
-                             , vgaInG :: Signal clk (Unsigned g)
-                             , vgaInB :: Signal clk (Unsigned b)
+                             , vgaInR :: Signal clk r
+                             , vgaInG :: Signal clk g
+                             , vgaInB :: Signal clk b
                              }
 
 data VGADriverOut clk w h r g b = VGADriverOut
@@ -40,7 +40,7 @@ data VGAParams w h = VGAParams
 
 data VGATiming a = VGATiming{ visibleSize, pre, syncPulse, post :: Unsigned a }
 
-driveVGA :: (Clock clk, Size r, Size g, Size b, Size w, Size h)
+driveVGA :: (Clock clk, Rep r, Rep g, Rep b, Size w, Size h)
          => VGAParams w h
          -> VGADriverIn clk r g b
          -> VGADriverOut clk w h r g b
@@ -78,9 +78,9 @@ driveVGA VGAParams{..} VGADriverIn{..} = runRTL $ do
     let vgaOutClkPhase = reg phase
         vgaOutX = packEnabled visible (reg hCount)
         vgaOutY = packEnabled visible (reg vCount)
-        vgaOut = VGA{ vgaR = mux visible (0, vgaInR)
-                    , vgaG = mux visible (0, vgaInG)
-                    , vgaB = mux visible (0, vgaInB)
+        vgaOut = VGA{ vgaR = packEnabled visible vgaInR
+                    , vgaG = packEnabled visible vgaInG
+                    , vgaB = packEnabled visible vgaInB
                     , vgaHSync = bitNot hsync
                     , vgaVSync = bitNot vsync
                     }
