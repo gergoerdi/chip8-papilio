@@ -8,7 +8,7 @@ import Language.KansasLava.Signal.Utils
 import Hardware.KansasLava.Boards.Papilio
 import Hardware.KansasLava.Boards.Papilio.Arcade
 import Hardware.KansasLava.VGA
-import VGADriver
+import Hardware.KansasLava.VGA.Driver
 
 import Data.Sized.Matrix (Matrix, matrix)
 import qualified Data.Sized.Matrix as Matrix
@@ -36,9 +36,9 @@ nextPair xy = pack (x + 1, mux nextRow (y, y + 1))
 
 drive64x32 :: (Clock clk)
            => VGADriverIn clk Bool () () -> VGADriverOut clk X6 X5 U4 U4 U4
-drive64x32 VGADriverIn{..} = VGADriverOut{ vgaOut = vgaOut
-                                         , vgaOutX = x'
-                                         , vgaOutY = y' }
+drive64x32 VGADriverIn{..} = VGADriverOut{ vgaOutX = x'
+                                         , vgaOutY = y'
+                                         , ..}
   where
     VGADriverOut{..} = driveVGA vga640x480at60 vgaDriverIn'
     vgaDriverIn' = VGADriverIn{ vgaInReset = vgaInReset
@@ -57,7 +57,7 @@ drive64x32 VGADriverIn{..} = VGADriverOut{ vgaOut = vgaOut
     x' = mapEnabled (\x -> signed $ (x - 64) `shiftR` 3) vgaOutX
     y' = mapEnabled (\y -> signed $ (y - 112) `shiftR` 3) vgaOutY
 
-    pixel = bitwise vgaInR
+    pixel = vgaInR
     r = spread pixel
     g = spread pixel
     b = spread pixel

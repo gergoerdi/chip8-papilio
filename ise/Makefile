@@ -2,7 +2,7 @@ MAIN		= Video
 TOP		= main
 VHDL_MODS	= dcm main
 XAW_MODS	= dcm_32_to_50p35
-HS_MODS		= VGADriver Utils
+HS_MODS		= Utils
 
 LAVADIR		= ../src
 HS_SRCS		= $(patsubst %, $(LAVADIR)/%.hs, $(HS_MODS) $(MAIN))
