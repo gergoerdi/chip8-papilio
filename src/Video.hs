@@ -40,7 +40,7 @@ drive64x32 VGADriverIn{..} = VGADriverOut{ vgaOut = vgaOut
                                          , vgaOutX = x'
                                          , vgaOutY = y' }
   where
-    VGADriverOut{..} = driveVGA vga640x480 vgaDriverIn'
+    VGADriverOut{..} = driveVGA vga640x480at60 vgaDriverIn'
     vgaDriverIn' = VGADriverIn{ vgaInReset = vgaInReset
                               , vgaInR = r
                               , vgaInG = g

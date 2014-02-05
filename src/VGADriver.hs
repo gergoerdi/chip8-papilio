@@ -5,7 +5,7 @@ module VGADriver
        , VGADriverIn(..)
        , VGADriverOut(..)
        , driveVGA
-       , vga640x480
+       , vga640x480at60
        ) where
 
 -- TODO: Move this whole module to Hardware.KansasLava.VGA.Driver
@@ -103,7 +103,9 @@ driveVGA VGAParams{..} VGADriverIn{..} = runRTL $ do
     vPost = post vgaVertTiming
     vMax = sum [vSize, vPre, vSync, vPost] - 1
 
-vga640x480 :: VGAParams X10 X10
-vga640x480 = VGAParams{ vgaHorizTiming = VGATiming 640 16 96 48
-                      , vgaVertTiming  = VGATiming 480 16  2 33
-                      }
+-- | VGA 640*480@60Hz
+-- Assumes a clock of 25.175 MHz
+vga640x480at60 :: VGAParams X10 X10
+vga640x480at60 = VGAParams{ vgaHorizTiming = VGATiming 640 16 96 48
+                          , vgaVertTiming  = VGATiming 480 16  2 33
+                          }
