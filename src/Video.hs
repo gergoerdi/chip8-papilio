@@ -1,6 +1,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleInstances #-}
+module Video (main, emitBench) where
+
 import Utils
 
 import Language.KansasLava
@@ -146,11 +148,11 @@ testBench = do
     initImage (x, y) = Just $ x `elem` [minBound, maxBound]
                             || y `elem` [minBound, maxBound]
 
-emitBench :: IO ()
-emitBench = do
+emitBench :: String -> Fabric () -> IO ()
+emitBench modName bench = do
     kleg <- reifyFabric $ do
         theClk clock
-        testBench
+        bench
 
     createDirectoryIfMissing True outPath
     writeVhdlPrelude $ outVHDL "lava-prelude"
@@ -162,10 +164,9 @@ emitBench = do
   where
     clock = "CLK_50MHZ"
 
-    modName = "Video"
     outPath = ".." </> "ise" </> "gensrc"
     outVHDL name = outPath </> name <.> "vhdl"
 
 main :: IO ()
 main = do
-    emitBench
+    emitBench "Video" testBench
