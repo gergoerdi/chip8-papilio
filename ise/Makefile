@@ -1,6 +1,6 @@
 MAIN		= Video
-TOP		= main
-VHDL_MODS	= dcm main
+TOP		= Video
+VHDL_MODS	=
 XAW_MODS	= dcm_32_to_50p35
 HS_MODS		= Utils
 
@@ -20,7 +20,7 @@ VHDLS		= $(LAVA_VHDLS) $(XAW_VHDLS) $(VHDL_SRCS)
 
 GEN_EXTS	= bgn bit bld drc ncd ngc ngd ngr pad par pcf ptwx syr unroutes ut xpi xst prj
 GEN_MAP_EXTS	= map mrp ncd ngm
-GENS		= $(LAVA_VHDLS) \
+GENS		= $(LAVA_VHDLS) $(UCF) \
 		  $(patsubst %, $(MAIN).%, $(GEN_EXTS)) \
 		  $(patsubst %, $(MAIN)_map.%, $(GEN_MAP_EXTS)) \
 		  $(patsubst %, $(MAIN)_%, bitgen.xwbt ngdbuild.xrpt pad.csv pad.txt summary.xml usage.xml xst.xrpt) \

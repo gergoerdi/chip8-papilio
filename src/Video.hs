@@ -4,8 +4,12 @@
 import Utils
 
 import Language.KansasLava
+import Language.KansasLava.VHDL
+import Language.Netlist.AST (Module)
+import Language.Netlist.GenVHDL
 import Language.KansasLava.Signal.Utils
 import Hardware.KansasLava.Boards.Papilio
+import Hardware.KansasLava.Boards.Papilio.DCM
 import Hardware.KansasLava.Boards.Papilio.Arcade
 import Hardware.KansasLava.VGA
 import Hardware.KansasLava.VGA.Driver
@@ -145,14 +149,19 @@ testBench = do
 emitBench :: IO ()
 emitBench = do
     kleg <- reifyFabric $ do
-        theClk "CLK_50MHZ"
+        theClk clock
         testBench
 
     createDirectoryIfMissing True outPath
     writeVhdlPrelude $ outVHDL "lava-prelude"
-    writeVhdlCircuit modName (outVHDL modName) kleg
+    mod <- netlistCircuit modName kleg
+    let mod' = dcm50MHz clock mod
+
+    writeFile (outVHDL modName) (genVHDL mod' ["work.lava.all", "work.all"])
     writeUCF (outPath </> modName <.> "ucf") kleg
   where
+    clock = "CLK_50MHZ"
+
     modName = "Video"
     outPath = ".." </> "ise" </> "gensrc"
     outVHDL name = outPath </> name <.> "vhdl"
