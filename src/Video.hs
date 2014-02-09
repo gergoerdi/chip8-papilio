@@ -4,6 +4,7 @@
 module Video (main, emitBench) where
 
 import Utils
+import DCM
 
 import Language.KansasLava
 import Language.KansasLava.VHDL
@@ -11,7 +12,6 @@ import Language.Netlist.AST (Module)
 import Language.Netlist.GenVHDL
 import Language.KansasLava.Signal.Utils
 import Hardware.KansasLava.Boards.Papilio
-import Hardware.KansasLava.Boards.Papilio.DCM
 import Hardware.KansasLava.Boards.Papilio.Arcade
 import Hardware.KansasLava.VGA
 import Hardware.KansasLava.VGA.Driver
