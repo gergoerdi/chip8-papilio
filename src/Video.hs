@@ -46,12 +46,7 @@ drive64x32 VGADriverIn{..} = VGADriverOut{ vgaOutX = x'
                                          , vgaOutY = y'
                                          , ..}
   where
-    VGADriverOut{..} = driveVGA vga640x480at60 vgaDriverIn'
-    vgaDriverIn' = VGADriverIn{ vgaInReset = vgaInReset
-                              , vgaInR = r
-                              , vgaInG = g
-                              , vgaInB = b
-                              }
+    VGADriverOut{..} = driveVGA vga640x480at60 (VGADriverIn r g b)
 
     (validX, x) = unpackEnabled vgaOutX
     (validY, y) = unpackEnabled vgaOutY
@@ -71,15 +66,13 @@ drive64x32 VGADriverIn{..} = VGADriverOut{ vgaOutX = x'
     spread s = mux (s .&&. inField) (minBound, maxBound)
 
 vgaFB :: forall clk. (Clock clk)
-      => Signal clk Bool
-      -> Signal clk FrameBuffer
+      => Signal clk FrameBuffer
       -> VGA clk U4 U4 U4
-vgaFB reset fb = vgaOut
+vgaFB fb = vgaOut
   where
     VGADriverOut{..} = drive64x32 VGADriverIn{..}
 
-    vgaInReset = reset
-    vgaInR = bitwise pixel
+    vgaInR = pixel
     vgaInG = pureS ()
     vgaInB = pureS ()
 
@@ -94,8 +87,6 @@ vgaFB reset fb = vgaOut
 testBench :: (Arcade fabric) => fabric ()
 testBench = do
     Buttons{..} <- buttons
-    (_, reset, _) <- debounce (Witness :: Witness X16) `liftM` resetButton
-
     let (_, buttonUp', _) = debounce (Witness :: Witness X16) buttonUp
     let (_, buttonDown', _) = debounce (Witness :: Witness X16) buttonDown
     let (_, buttonLeft', _) = debounce (Witness :: Witness X16) buttonLeft
@@ -138,7 +129,7 @@ testBench = do
             return $ packEnabled (reg we) $ pack (cursor, reg d)
         fb = ramWithInit nextPair (rom `flip` initImage) writeFB
 
-    vga . encodeVGA $ vgaFB reset fb
+    vga . encodeVGA $ vgaFB fb
   where
     toggle btn = runRTL $ do
         buf <- newReg False
@@ -152,6 +143,7 @@ emitBench :: String -> Fabric () -> IO ()
 emitBench modName bench = do
     kleg <- reifyFabric $ do
         theClk clock
+        wing_init
         bench
 
     createDirectoryIfMissing True outPath
