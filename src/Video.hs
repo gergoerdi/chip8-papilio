@@ -8,19 +8,14 @@ import DCM
 
 import Language.KansasLava
 import Language.KansasLava.VHDL
-import Language.Netlist.AST (Module)
 import Language.Netlist.GenVHDL
 import Language.KansasLava.Signal.Utils
-import Hardware.KansasLava.Boards.Papilio
 import Hardware.KansasLava.Boards.Papilio.Arcade
 import Hardware.KansasLava.VGA
 import Hardware.KansasLava.VGA.Driver
 
-import Data.Sized.Matrix (Matrix, matrix)
-import qualified Data.Sized.Matrix as Matrix
 import Data.Sized.Unsigned as Unsigned
 import Data.Sized.Ix
-import Control.Monad (liftM)
 import Data.Bits
 
 import System.FilePath
@@ -131,11 +126,6 @@ testBench = do
 
     vga . encodeVGA $ vgaFB fb
   where
-    toggle btn = runRTL $ do
-        buf <- newReg False
-        WHEN btn $ buf := bitNot (reg buf)
-        return $ reg buf
-
     initImage (x, y) = Just $ x `elem` [minBound, maxBound]
                             || y `elem` [minBound, maxBound]
 
