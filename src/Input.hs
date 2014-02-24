@@ -10,10 +10,12 @@ import Hardware.KansasLava.Boards.Papilio.Arcade
 import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Gen
 
-import Data.Sized.Matrix (matrix)
+import Data.Sized.Matrix (matrix, Matrix)
+import qualified Data.Sized.Matrix as Matrix
 import Data.Sized.Unsigned as Unsigned
 import Data.Sized.Ix
 import Data.Bits
+import Data.Traversable (forM)
 
 data PS2State = Idle
               | Shift
@@ -90,7 +92,7 @@ drivePS2 line = runRTL $ do
     haveCode <- newReg False
     let enableOutput = var haveCode .&&. isEnabled line
 
-    CASE . return . match line $ \ps2Data -> do
+    whenEnabled line $ \ps2Data -> do
         CASE
           [ IF (reg state .==. pureS Idle) $ do
                  state := mux ps2Data (pureS Shift, pureS Idle)
@@ -111,33 +113,58 @@ drivePS2 line = runRTL $ do
 
     return $ packEnabled enableOutput (reg shift)
 
-checkPressed :: (Clock clk)
-             => Signal clk U8 -> Signal clk (Enabled U8) -> Signal clk Bool
-checkPressed key scancode = runRTL $ do
-    b <- newReg False
+whenEnabled sig = CASE . return . match sig
+
+-- TODO: This doesn't work for multi-byte scancodes
+decodePS2 :: (Clock clk)
+          => Signal clk (Enabled U8) -> Signal clk (Enabled (Bool, U8))
+decodePS2 scancode = runRTL $ do
     releasing <- newReg False
+    lastKey <- newReg Nothing
 
-    CASE . return . match scancode $ \code -> do
-        CASE [ IF (reg releasing) $ do
-                    releasing := low
-                    WHEN (code .==. key) $ do
-                        b := low
-             , IF (code .==. 0xF0) $ do
-                    releasing := high
-             , OTHERWISE $ do
-                    WHEN (code .==. key) $ do
-                        b := high
-             ]
+    CASE [ match scancode $ \code -> do
+                CASE [ IF (reg releasing) $ do
+                            releasing := low
+                     , IF (code .==. 0xF0) $ do
+                            releasing := high
+                     ]
+                lastKey := enabledS $ pack (bitNot (reg releasing), code)
+         , OTHERWISE $ do
+                lastKey := disabledS
+         ]
 
-    return $ reg b
+    return $ reg lastKey
+
+keyboard :: forall clk n. (Clock clk, Size n, Num n, Rep n)
+         => Matrix n U8
+         -> Signal clk (Enabled (Bool, U8))
+         -> Signal clk (Matrix n Bool)
+keyboard keys lastKey = runRTL $ do
+    latches <- forM keys $ \key -> do
+        r <- newReg False
+        return (key, r)
+
+    whenEnabled lastKey $ \lastKey -> do
+        let (pressed, code) = unpack lastKey
+        CASE $ Matrix.toList . flip fmap latches $ \(key, r) ->
+          IF (code .==. pureS key) $ r := pressed
+
+    return $ pack $ fmap (reg . snd) latches
 
 testBench :: (Arcade fabric) => fabric ()
 testBench = do
     (ps2A@PS2{..}, _) <- ps2
-    let scancode = drivePS2 . debouncePS2 $ ps2A
+    let scancode = decodePS2 . drivePS2 . debouncePS2 $ ps2A
+        kb = keyboard codes scancode
 
-    -- 0x15 is the PS/2 scan code for 'Q'
-    leds $ matrix [low, low, low, checkPressed 0x15 scancode]
+    leds $ unpack kb `Matrix.cropAt` 0
+  where
+    codes :: Matrix X16 U8
+    codes = matrix [ 0x16, 0x1e, 0x26, 0x25
+                   , 0x15, 0x22, 0x24, 0x2D
+                   , 0x1C, 0x1B, 0x23, 0x2B
+                   , 0x1A, 0x22, 0x21, 0x2A
+                   ]
 
 main :: IO ()
 main = do
