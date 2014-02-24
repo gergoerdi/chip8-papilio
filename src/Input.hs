@@ -113,6 +113,10 @@ drivePS2 line = runRTL $ do
 
     return $ packEnabled enableOutput (reg shift)
 
+whenEnabled :: (Clock clk, Rep a)
+            => Signal clk (Enabled a)
+            -> (Signal clk a -> RTL s clk ())
+            -> RTL s clk ()
 whenEnabled sig = CASE . return . match sig
 
 -- TODO: This doesn't work for multi-byte scancodes
