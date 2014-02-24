@@ -45,8 +45,8 @@ instance Rep PS2State where
 instance Arbitrary PS2State where
     arbitrary = elements [minBound..maxBound]
 
-prop_PS2State_Rep :: PS2State -> Bool
-prop_PS2State_Rep = unX . fromRep . toRep . optX . Just === Just
+prop_PS2State_Rep :: Maybe PS2State -> Bool
+prop_PS2State_Rep = unX . fromRep . toRep . optX === id
   where
     infix 4 ===
     f === g = \x -> f x == g x
