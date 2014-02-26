@@ -1,8 +1,9 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Video (main, emitBench) where
+module Video (main, emitBench, vgaFB, encodeVGA) where
 
+import Types
 import Utils
 import DCM
 
@@ -21,22 +22,10 @@ import Data.Bits
 import System.FilePath
 import System.Directory
 
-type VidX = U6
-type VidY = U5
-type PixData = Bool
-
 type FrameBuffer = (VidX, VidY) -> PixData
 
-nextPair :: (Size a, Size b)
-         => Signal clk (Unsigned a, Unsigned b)
-         -> Signal clk (Unsigned a, Unsigned b)
-nextPair xy = pack (x + 1, mux nextRow (y, y + 1))
-  where
-    (x, y) = unpack xy
-    nextRow = x .==. maxBound
-
 drive64x32 :: (Clock clk)
-           => VGADriverIn clk Bool () () -> VGADriverOut clk X6 X5 U4 U4 U4
+           => VGADriverIn clk Bool () () -> VGADriverOut clk (W VidX) (W VidY) U4 U4 U4
 drive64x32 VGADriverIn{..} = VGADriverOut{ vgaOutX = x'
                                          , vgaOutY = y'
                                          , ..}
@@ -62,10 +51,10 @@ drive64x32 VGADriverIn{..} = VGADriverOut{ vgaOutX = x'
 
 vgaFB :: forall clk. (Clock clk)
       => Signal clk FrameBuffer
-      -> VGA clk U4 U4 U4
-vgaFB fb = vgaOut
+      -> VGADriverOut clk (W VidX) (W VidY) U4 U4 U4
+vgaFB fb = vga
   where
-    VGADriverOut{..} = drive64x32 VGADriverIn{..}
+    vga@VGADriverOut{..} = drive64x32 VGADriverIn{..}
 
     vgaInR = pixel
     vgaInG = pureS ()
@@ -122,9 +111,9 @@ testBench = do
                  ]
 
             return $ packEnabled (reg we) $ pack (cursor, reg d)
-        fb = ramWithInit nextPair (rom `flip` initImage) writeFB
+        (fb, _) = ramWithInit nextPair (rom `flip` initImage) writeFB
 
-    vga . encodeVGA $ vgaFB fb
+    vga . encodeVGA . vgaOut $ vgaFB fb
   where
     initImage (x, y) = Just $ x `elem` [minBound, maxBound]
                             || y `elem` [minBound, maxBound]
