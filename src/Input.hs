@@ -1,6 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables, TypeFamilies #-}
 {-# LANGUAGE RecordWildCards #-}
-module Input (main) where
+module Input (main, chip8Keyboard) where
 
 import Video hiding (main)
 
@@ -51,13 +51,10 @@ keyboard keys lastKey = runRTL $ do
 
     return $ pack $ fmap (reg . snd) latches
 
-testBench :: (Arcade fabric) => fabric ()
-testBench = do
+chip8Keyboard :: (Arcade fabric) => fabric (Seq (Matrix X16 Bool))
+chip8Keyboard = do
     (ps2A@PS2{..}, _) <- ps2
-    let scancode = eventPS2 . decodePS2 . samplePS2 $ ps2A
-        kb = keyboard codes scancode
-
-    leds $ unpack kb `Matrix.cropAt` 0
+    return $ keyboard codes $ eventPS2 . decodePS2 . samplePS2 $ ps2A
   where
     codes :: Matrix X16 U8
     codes = matrix [ 0x16, 0x1e, 0x26, 0x25
@@ -65,6 +62,11 @@ testBench = do
                    , 0x1C, 0x1B, 0x23, 0x2B
                    , 0x1A, 0x22, 0x21, 0x2A
                    ]
+
+testBench :: (Arcade fabric) => fabric ()
+testBench = do
+    kb <- chip8Keyboard
+    leds $ unpack kb `Matrix.cropAt` 0
 
 main :: IO ()
 main = do
