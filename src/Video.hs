@@ -43,11 +43,11 @@ drive64x32 VGADriverIn{..} = VGADriverOut{ vgaOutX = x'
     y' = mapEnabled (\y -> signed $ (y - 112) `shiftR` 3) vgaOutY
 
     pixel = vgaInR
-    r = spread pixel
-    g = spread pixel
-    b = spread pixel
+    r = mux inField (maxBound, spread pixel)
+    g = mux inField (minBound, spread pixel)
+    b = mux inField (minBound, spread pixel)
 
-    spread s = mux (s .&&. inField) (minBound, maxBound)
+    spread s = mux s (minBound, maxBound)
 
 vgaFB :: forall clk. (Clock clk)
       => Signal clk FrameBuffer
