@@ -195,8 +195,7 @@ cpu CPUIn{..} = runRTL $ do
             timer := reg vX
             doneNext
         waitKey = do
-            -- TODO
-            return ()
+            s := pureS WaitKey
         setSound = do
             sound := reg vX
             doneNext
@@ -281,6 +280,12 @@ cpu CPUIn{..} = runRTL $ do
                  , 0x65 ==> loadRegs
                  ]
                ]
+      , WaitKey ==> do
+             CASE [ IF (cpuKeys .!. pureS i) $ do
+                         vX := pureS (fromIntegral i)
+                         doneNext
+                  | i <- [minBound..maxBound]
+                  ]
       , ClearFB ==> do
              nextFBA := nextPair (reg nextFBA)
              WHEN (reg nextFBA .==. pureS maxBound) doneNext
