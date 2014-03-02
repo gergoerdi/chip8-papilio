@@ -313,7 +313,7 @@ cpu CPUIn{..} = runRTL $ do
                   ]
 
              -- TODO: set vF from cpuFBD
-             WHEN (x .==. maxBound .&&. y .==. op4) doneNext
+             WHEN (y' .==. op4) doneNext
       , WriteMem ==> CASE
           [ match (reg regsIdx) $ \i -> do
                  nextA := reg nextA + 1
