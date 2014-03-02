@@ -152,7 +152,6 @@ cpu CPUIn{..} = runRTL $ do
             nextFBA := pureS minBound
             nextPixel := low
             s := pureS ClearFB
-            doneNext
         ret = do
             sp := reg sp - 1
             pc := reg (stackAt (reg sp - 1))
@@ -187,6 +186,8 @@ cpu CPUIn{..} = runRTL $ do
             nextFBA := pack (unsigned $ reg vX, unsigned $ reg vY)
             waitPattern := high
             waitPixel := high
+            drawX := 0
+            drawY := 0
             s := pureS Draw
         getTimer = do
             vX := reg timer
