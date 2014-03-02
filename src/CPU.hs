@@ -125,7 +125,7 @@ cpu CPUIn{..} = runRTL $ do
     opLo <- newReg 0
     let (op1, op2) = nybbles (reg opHi)
         (op3, op4) = nybbles (var opLo)
-        addr = appendS op2 (var opLo)
+        addr = flip appendS op2 (var opLo)
         imm = var opLo
 
     let vX = registerOf (unsigned op2)
