@@ -7,6 +7,7 @@ import Types
 import Video hiding (main)
 import Input hiding (main)
 import CPU
+import Font
 import Utils
 
 import Language.KansasLava
@@ -22,9 +23,25 @@ import Data.Sized.Matrix (matrix, Matrix)
 -- import Data.Sized.Unsigned as Unsigned
 import Data.Sized.Ix
 -- import Data.Traversable (forM)
+import Data.Foldable (toList)
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
+import Data.Monoid
+
+linkProg :: ByteString -> ByteString
+linkProg = (prelude <>)
+  where
+    prelude = fontROM <> BS.replicate (0x200 - BS.length fontROM) 0
+fontROM = BS.pack . concatMap (padr 8 0 . toList) . toList $ fontData
+
+imageROM :: ByteString -> Addr -> Byte
+imageROM bs = \i -> let i' = fromIntegral i
+                    in if i' < len then fromIntegral (BS.index bs i') else 0
+  where
+    len = BS.length bs
 
 -- chip8 :: forall clk. (Clock clk) => Signal clk (Matrix X16 Bool) -> VGA clk U4 U4 U4
-chip8 kbd = (ram, fb, CPUIn{..}, CPUOut{..}, vgaOut)
+chip8 prog kbd = (ram, fb, CPUIn{..}, CPUOut{..}, vgaOut)
   where
     CPUOut{..} = cpu CPUIn{..}
     (fb, fillFB) = ramWithInit nextPair (const low) $ packEnabled (isEnabled cpuFBW) (pack (cpuFBA, enabledVal cpuFBW))
@@ -38,25 +55,20 @@ chip8 kbd = (ram, fb, CPUIn{..}, CPUOut{..}, vgaOut)
 
     -- initROM :: Signal clk Addr -> Signal clk Byte
     initROM :: Signal CLK Addr -> Signal CLK Byte
-    initROM = flip rom $ \x -> case x of
-        0x000 -> Just 0x42 -- 01000010
-        0x001 -> Just 0xa5 -- 10100101
-        0x002 -> Just 0x99 -- 10011001
-        0x003 -> Just 0x42 -- 01000010
-        0x004 -> Just 0x42 -- 01000010
-        0x005 -> Just 0x24 -- 00100100
-        0x006 -> Just 0x18 -- 00011000
-        0x007 -> Just 0x03 -- 00000011
-        0x200 -> Just 0xd0
-        0x201 -> Just 0x08
-        0x202 -> Just 0x00
-        0x203 -> Just 0x00
-        _ -> Just 0x00
+    initROM = flip rom $ Just . imageROM (linkProg prog)
+
     VGADriverOut{..} = vgaFB fb
 
 noKbd :: Signal CLK (Matrix X16 Bool)
 noKbd = pureS $ matrix $ replicate 16 False
 
+testProg :: ByteString
+testProg = BS.pack [ 0xf1, 0x0a -- WaitKey V1
+                   , 0x00, 0xe0 -- ClrScr
+                   , 0xf1, 0x29 -- LoadFont V1
+                   , 0xd0, 0x05 -- Draw V0 V0 5
+                   , 0x12, 0x00 -- Jmp 0x200
+                   ]
 -- initTime = 8194
 initTime = 8204
 (ram, fb, cin, cout, _) = chip8 noKbd
@@ -73,7 +85,16 @@ showFB f = map (\(x,y) -> if f (x,y) then '*' else ' ') [(x, 0) | x <- [0..7]]
 
 
 main :: IO ()
-main = emitBench "Chip8" $ do
-    kbd <- chip8Keyboard
-    let (_, _, _cpuIn, _cpuOut, vgaOut) = chip8 kbd
-    vga . encodeVGA $ vgaOut
+main = do
+    -- [filename] <- getArgs
+    -- let filename = "/tmp/15puzzle.ch8"
+    -- prog <- BS.readFile filename
+    emitBench "Chip8" $ do
+        kbd <- chip8Keyboard
+        let (_, _, _cpuIn, cpuOut, vgaOut) = chip8 testProg kbd
+        vga . encodeVGA $ vgaOut
+        leds $ matrix [ high
+                      , cpuState cpuOut .==. pureS ClearFB
+                      , cpuState cpuOut .==. pureS WaitKey
+                      , cpuState cpuOut .==. pureS Draw
+                      ]
