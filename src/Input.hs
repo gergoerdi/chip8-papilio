@@ -57,10 +57,24 @@ chip8Keyboard = do
     return $ keyboard codes $ eventPS2 . decodePS2 . samplePS2 $ ps2A
   where
     codes :: Matrix X16 U8
-    codes = matrix [ 0x16, 0x1E, 0x26, 0x25
-                   , 0x15, 0x1D, 0x24, 0x2D
-                   , 0x1C, 0x1B, 0x23, 0x2B
-                   , 0x1A, 0x22, 0x21, 0x2A
+    codes = matrix [ 0x22 -- X
+
+                   , 0x16 -- 1
+                   , 0x1E -- 2
+                   , 0x26 -- 3
+                   , 0x15 -- Q
+                   , 0x1D -- W
+                   , 0x24 -- E
+                   , 0x1C -- A
+                   , 0x1B -- S
+                   , 0x23 -- D
+
+                   , 0x1A -- Z
+                   , 0x21 -- C
+                   , 0x25 -- 4
+                   , 0x2D -- R
+                   , 0x2B -- F
+                   , 0x2A -- V
                    ]
 
 testBench :: (Arcade fabric) => fabric ()
