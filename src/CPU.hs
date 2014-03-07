@@ -97,10 +97,10 @@ nybbles sig = (hi, lo)
 cpu :: forall clk. (Clock clk) => CPUIn clk -> CPUOut clk
 cpu CPUIn{..} = runRTL $ do
     registerOf <- newArr (Witness :: Witness X16)
-    stackAt <- newArr (Witness :: Witness X20)
+    stackAt <- newArr (Witness :: Witness X32)
 
     pc <- newReg 0x200
-    sp <- newReg 0
+    sp <- newReg (0 :: U5)
     ptr <- newReg 0x000
     timer <- newReg 0
     sound <- newReg 0
@@ -154,13 +154,13 @@ cpu CPUIn{..} = runRTL $ do
             s := pureS ClearFB
         ret = do
             sp := reg sp - 1
-            pc := reg (stackAt (reg sp - 1))
+            pc := reg (stackAt (bitwise $ reg sp - 1))
             done
         jmp dest = do
             pc := dest
             done
         call = do
-            stackAt (reg sp) := addr
+            stackAt (bitwise $ reg sp) := reg pc + 2
             pc := addr
             sp := reg sp + 1
             done
