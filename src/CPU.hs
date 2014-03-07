@@ -319,7 +319,7 @@ cpu CPUIn{..} = runRTL $ do
           [ match (reg regsIdx) $ \i -> do
                  nextA := reg nextA + 1
                  nextW := reg (registerOf i)
-                 CASE [ IF (i .==. unsigned (reg vX)) $ do
+                 CASE [ IF (i .==. unsigned op2) $ do
                              regsIdx := disabledS
                              doneNext
                       , OTHERWISE $ do
@@ -339,7 +339,7 @@ cpu CPUIn{..} = runRTL $ do
           [ match (reg regsIdx) $ \i -> do
                  nextA := reg nextA + 1
                  registerOf i := cpuMemD
-                 CASE [ IF (i .==. unsigned (reg vX)) $ do
+                 CASE [ IF (i .==. unsigned op2) $ do
                              regsIdx := disabledS
                              doneNext
                       , OTHERWISE $ do
