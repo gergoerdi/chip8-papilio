@@ -218,6 +218,7 @@ cpu CPUIn{..} = runRTL $ do
             s := pureS Read
         addPtr = do
             ptr := reg ptr + unsigned (reg vX)
+            doneNext
         halt = do
             s := pureS Halt
 
