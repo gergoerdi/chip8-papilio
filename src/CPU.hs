@@ -8,11 +8,12 @@ import ALU (alu, bcd)
 
 import Language.KansasLava
 import Language.KansasLava.Signal.Utils
-import Data.Sized.Matrix (Matrix)
+import Data.Sized.Matrix (Matrix, (!))
+import qualified Data.Sized.Matrix as Matrix
 import Data.Sized.Unsigned as Unsigned
 import Data.Sized.Ix
 import Data.Bits
-import Control.Monad
+import Data.Foldable (forM_)
 
 import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Gen
@@ -82,7 +83,10 @@ nybbles sig = (hi, lo)
 
 cpu :: forall clk. (Clock clk) => CPUIn clk -> CPUOut clk
 cpu CPUIn{..} = runRTL $ do
-    registerOf <- newArr (Witness :: Witness X16)
+    registers <- newRegs (Matrix.forAll (const 0))
+    let registerOf = regIdx registers
+        setRegister = setIdx registers
+
     stackAt <- newArr (Witness :: Witness X32)
 
     pc <- newReg 0x200
@@ -114,11 +118,12 @@ cpu CPUIn{..} = runRTL $ do
         addr = flip appendS op2 (var opLo)
         imm = var opLo
 
-    let vX = registerOf (unsigned op2)
-        vY = registerOf (unsigned op3)
+    let x = unsigned op2
+        y = unsigned op3
+        vX = registerOf x
+        vY = registerOf y
         v0 = registerOf 0x0
-        vF = registerOf 0xf
-        (carry, res) = alu op4 (reg vX) (reg vY)
+        (carry, res) = alu op4 vX vY
 
     WHEN cpuVBlank $ do
         timer := mux (reg timer .==. 0) (reg timer - 1, 0)
@@ -151,44 +156,45 @@ cpu CPUIn{..} = runRTL $ do
             sp := reg sp + 1
             done
         putImm = do
-            vX := imm
+            setRegister x imm
             doneNext
         addImm = do
-            vX := reg vX + imm
+            setRegister x (vX + imm)
             doneNext
         move = do
-            vX := res
-            whenEnabled carry $ \c -> vF := mux c (0, 1)
+            setRegister x res
+            whenEnabled carry $ \c -> do
+                registers ! 0xf := mux c (0, 1)
             doneNext
         setPtr = do
             ptr := addr
             doneNext
         randomize = do
             -- TODO
-            vX := (reg vX + 1) .&. imm
+            setRegister x ((vX + 1) .&. imm)
             doneNext
         drawSprite = do
             nextA := reg ptr
-            nextFBA := pack (unsigned $ reg vX, unsigned $ reg vY)
+            nextFBA := pack (unsigned vX, unsigned vY)
             waitPattern := high
             waitPixel := high
             drawX := 0
             drawY := 0
             s := pureS Draw
         getTimer = do
-            vX := reg timer
+            setRegister x (reg timer)
             doneNext
         setTimer = do
-            timer := reg vX
+            timer := vX
             doneNext
         waitKey = do
             s := pureS WaitKey
         setSound = do
-            sound := reg vX
+            sound := vX
             doneNext
         loadFont = do
             -- This assumes the font for value x starts in RAM in address x * 8
-            ptr := unsigned ((reg vX .&. 0x0f) `shiftL` 3)
+            ptr := unsigned ((vX .&. 0x0f) `shiftL` 3)
             doneNext
         storeBCD = do
             nextA := reg ptr
@@ -203,15 +209,15 @@ cpu CPUIn{..} = runRTL $ do
             regsIdx := enabledS 0
             s := pureS Read
         addPtr = do
-            ptr := reg ptr + unsigned (reg vX)
+            ptr := reg ptr + unsigned vX
             doneNext
         halt = do
             s := pureS Halt
 
     switch (reg s)
       [ Init ==> do
-             forM_ [minBound..maxBound] $ \i -> do
-                 registerOf (pureS i) := 0
+             forM_ registers $ \r -> do
+                 r := 0
              WHEN cpuStart done
       , Fetch1 ==> do
              nextA := reg pc
@@ -234,26 +240,26 @@ cpu CPUIn{..} = runRTL $ do
                         ]
                , 0x1 ==> jmp addr
                , 0x2 ==> call
-               , 0x3 ==> skipIf (reg vX .==. imm)
-               , 0x4 ==> skipIf (reg vX ./=. imm)
+               , 0x3 ==> skipIf (vX .==. imm)
+               , 0x4 ==> skipIf (vX ./=. imm)
                , 0x5 ==> switch op4
-                 [ 0x0 ==> skipIf (reg vX .==. reg vY)
+                 [ 0x0 ==> skipIf (vX .==. vY)
                  , oTHERWISE halt
                  ]
                , 0x6 ==> putImm
                , 0x7 ==> addImm
                , 0x8 ==> move
                , 0x9 ==> switch op4
-                 [ 0x0 ==> skipIf (reg vX ./=. reg vY)
+                 [ 0x0 ==> skipIf (vX ./=. vY)
                  , oTHERWISE halt
                  ]
                , 0xa ==> setPtr
-               , 0xb ==> jmp (unsigned (reg v0) + addr)
+               , 0xb ==> jmp (unsigned v0 + addr)
                , 0xc ==> randomize
                , 0xd ==> drawSprite
                , 0xe ==> switch (var opLo)
-                 [ 0x9e ==> skipIf (cpuKeys .!. unsigned (reg vX))
-                 , 0xa1 ==> skipIf (bitNot $ cpuKeys .!. unsigned (reg vX))
+                 [ 0x9e ==> skipIf (cpuKeys .!. unsigned vX)
+                 , 0xa1 ==> skipIf (bitNot $ cpuKeys .!. unsigned vX)
                  , oTHERWISE halt
                  ]
                , 0xf ==> switch (var opLo)
@@ -272,7 +278,7 @@ cpu CPUIn{..} = runRTL $ do
              whenEnabled cpuKeyEvent $ \ev -> do
                  let (pressed, key) = unpack ev
                  WHEN pressed $ do
-                     vX := unsigned key
+                     setRegister x $ unsigned key
                      doneNext
       , ClearFB ==> do
              nextFBA := nextPair (reg nextFBA)
@@ -281,7 +287,7 @@ cpu CPUIn{..} = runRTL $ do
              let x = reg drawX
                  y = reg drawY
              let x' = x + 1
-                 newLine = x .==. maxBound
+                 newLine = x .==. pureS maxBound
                  y' = mux newLine (y, y + 1)
              CASE [ IF (reg waitPixel) $ do
                          waitPixel := low
@@ -297,7 +303,7 @@ cpu CPUIn{..} = runRTL $ do
                          nextPixel := (reg drawPattern `testABit` 7) `xor2` cpuFBD
                          waitPixel := high
                          drawPattern := reg drawPattern `shiftL` 1
-                         nextFBA := pack (unsigned $ reg vX + unsigned x', unsigned $ reg vY + unsigned y')
+                         nextFBA := pack (unsigned $ vX + unsigned x', unsigned $ vY + unsigned y')
                   ]
 
              -- TODO: set vF from cpuFBD
@@ -305,7 +311,7 @@ cpu CPUIn{..} = runRTL $ do
       , WriteMem ==> CASE
           [ match (reg regsIdx) $ \i -> do
                  nextA := reg nextA + 1
-                 nextW := reg (registerOf i)
+                 nextW := registerOf i
                  CASE [ IF (i .==. unsigned op2) $ do
                              regsIdx := disabledS
                              doneNext
@@ -314,8 +320,8 @@ cpu CPUIn{..} = runRTL $ do
                       ]
           , match (reg writeBCD) $ \i -> do
                  nextA := reg nextA + 1
-                 nextW := bcd (reg vX) .!. i
-                 CASE [ IF (i .==. maxBound) $ do
+                 nextW := bcd vX .!. i
+                 CASE [ IF (i .==. pureS maxBound) $ do
                              writeBCD := disabledS
                              doneNext
                       , OTHERWISE $ do
@@ -325,7 +331,7 @@ cpu CPUIn{..} = runRTL $ do
       , Read ==> CASE
           [ match (reg regsIdx) $ \i -> do
                  nextA := reg nextA + 1
-                 registerOf i := cpuMemD
+                 setRegister i cpuMemD
                  CASE [ IF (i .==. unsigned op2) $ do
                              regsIdx := disabledS
                              doneNext
