@@ -21,6 +21,7 @@ data CPUIn clk = CPUIn{ cpuMemD :: Signal clk Byte
                       , cpuStart :: Signal clk Bool
                       , cpuVBlank :: Signal clk Bool
                       , cpuFBD :: Signal clk PixData
+                      , cpuKeyEvent :: Signal clk (Enabled (Bool, X16))
                       , cpuKeys :: Signal clk (Matrix X16 Bool)
                       }
 
@@ -268,11 +269,11 @@ cpu CPUIn{..} = runRTL $ do
                  ]
                ]
       , WaitKey ==> do
-             CASE [ IF (cpuKeys .!. pureS i) $ do
-                         vX := pureS (fromIntegral i)
-                         doneNext
-                  | i <- [minBound..maxBound]
-                  ]
+             whenEnabled cpuKeyEvent $ \ev -> do
+                 let (pressed, key) = unpack ev
+                 WHEN pressed $ do
+                     vX := unsigned key
+                     doneNext
       , ClearFB ==> do
              nextFBA := nextPair (reg nextFBA)
              WHEN (reg nextFBA .==. pureS maxBound) doneNext
