@@ -1,4 +1,4 @@
-module Utils (betweenCO, ramWithInit, nextPair) where
+module Utils (betweenCO, ramWithInit, nextPair, combineEnabled) where
 
 import Language.KansasLava
 import Data.Sized.Ix
@@ -41,3 +41,12 @@ nextPair xy = pack (x + 1, mux nextRow (y, y + 1))
   where
     (x, y) = unpack xy
     nextRow = x .==. maxBound
+
+combineEnabled :: (Clock clk, Rep a)
+               => Signal clk (Enabled a)
+               -> Signal clk (Enabled a)
+               -> Signal clk (Enabled a)
+combineEnabled s1 s2 = packEnabled (en1 .||. en2) (mux en1 (v2, v1))
+  where
+    (en1, v1) = unpackEnabled s1
+    (en2, v2) = unpackEnabled s2

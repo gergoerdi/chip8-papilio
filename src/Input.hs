@@ -3,6 +3,7 @@
 module Input (main, chip8Keyboard) where
 
 import Video hiding (main)
+import Utils
 
 import Language.KansasLava
 import Language.KansasLava.Signal.Utils
@@ -34,6 +35,19 @@ eventPS2 scancode = runRTL $ do
          ]
 
     return $ reg lastKey
+
+decodeEvent :: forall clk a n. (Clock clk, Rep a, Eq a, Rep n, Size n, Num n)
+            => Matrix n a
+            -> Signal clk (Enabled (Bool, a))
+            -> Signal clk (Enabled (Bool, n))
+decodeEvent keys eevent = packEnabled (en .&&. en') $ pack (pressed, val')
+  where
+    (en, event) = unpackEnabled eevent
+    (pressed, val) = unpack event
+    (en', val') = unpackEnabled . foldr check disabledS $ Matrix.assocs keys
+      where
+        check :: (n, a) -> Signal clk (Enabled n) -> Signal clk (Enabled n)
+        check (i, x) s = combineEnabled s $ packEnabled (val .==. pureS x) (pureS i)
 
 keyboard :: forall clk n. (Clock clk, Size n, Num n, Rep n)
          => Matrix n U8
