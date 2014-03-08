@@ -8,7 +8,7 @@ import ALU (alu, bcd)
 
 import Language.KansasLava
 import Language.KansasLava.Signal.Utils
-import Data.Sized.Matrix (Matrix, matrix)
+import Data.Sized.Matrix (Matrix)
 import Data.Sized.Unsigned as Unsigned
 import Data.Sized.Ix
 import Data.Bits

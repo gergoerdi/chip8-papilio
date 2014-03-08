@@ -64,12 +64,6 @@ eventLatch event = runRTL $ do
 
     return $ pack . fmap reg $ latches
 
-keyboard :: forall clk n. (Clock clk, Size n, Num n, Rep n)
-         => Matrix n U8
-         -> Signal clk (Enabled (Bool, U8))
-         -> Signal clk (Matrix n Bool)
-keyboard keys = eventLatch . decodeEvent keys
-
 chip8Keycodes :: Matrix X16 U8
 chip8Keycodes = matrix
     [ 0x22 -- X
