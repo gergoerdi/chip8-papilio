@@ -92,14 +92,15 @@ chip8Keycodes = matrix
     , 0x2A -- V
     ]
 
-chip8Keyboard :: (Arcade fabric) => fabric (Seq (Matrix X16 Bool))
+chip8Keyboard :: (Arcade fabric) => fabric (Seq (Enabled (Bool, X16)), Seq (Matrix X16 Bool))
 chip8Keyboard = do
     (ps2A@PS2{..}, _) <- ps2
-    return $ keyboard chip8Keycodes $ eventPS2 . decodePS2 . samplePS2 $ ps2A
+    let event = decodeEvent chip8Keycodes . eventPS2 . decodePS2 . samplePS2 $ ps2A
+    return (event, eventLatch event)
 
 testBench :: (Arcade fabric) => fabric ()
 testBench = do
-    kb <- chip8Keyboard
+    (_, kb) <- chip8Keyboard
     leds $ unpack kb `Matrix.cropAt` 0
 
 main :: IO ()
