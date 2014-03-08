@@ -26,7 +26,7 @@ data CPUIn clk = CPUIn{ cpuMemD :: Signal clk Byte
                       }
 
 data CPUOut clk = CPUOut{ cpuMemA :: Signal clk Addr
-                        , cpuMemW :: Signal clk (Enabled Byte)
+                        , cpuMemW :: Signal clk (Pipe Addr Byte)
                         , cpuFBA :: Signal clk (VidX, VidY)
                         , cpuFBW :: Signal clk (Enabled PixData)
                         , cpuSound :: Signal clk Bool
@@ -338,7 +338,7 @@ cpu CPUIn{..} = runRTL $ do
     let cpuMemA = var nextA
         cpuFBA = reg nextFBA
         cpuSound = reg sound ./=. 0
-        cpuMemW = packEnabled (reg s .==. pureS WriteMem) (var nextW)
+        cpuMemW = packEnabled (reg s .==. pureS WriteMem) $ pack (reg nextA, var nextW)
         cpuFBW =  packEnabled (bitNot (reg waitPixel) .&&. (reg s .==. pureS Draw .||. reg s .==. pureS ClearFB)) (var nextPixel)
 
         cpuOp = pack (reg opHi, var opLo)

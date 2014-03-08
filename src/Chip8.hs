@@ -45,7 +45,7 @@ chip8 prog (kevent, kbd) = (ram, fb, CPUIn{..}, CPUOut{..}, vgaOut)
   where
     CPUOut{..} = cpu CPUIn{..}
     (fb, fillFB) = ramWithInit nextPair (const low) $ packEnabled (isEnabled cpuFBW) (pack (cpuFBA, enabledVal cpuFBW))
-    (ram, fillRAM) = ramWithInit (+1) initROM $ packEnabled (isEnabled cpuMemW) (pack (cpuMemA, enabledVal cpuMemW))
+    (ram, fillRAM) = ramWithInit (+1) initROM cpuMemW
 
     cpuMemD = syncRead ram cpuMemA
     cpuFBD = syncRead fb cpuFBA
