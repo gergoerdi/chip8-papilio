@@ -1,6 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables, TypeFamilies #-}
 {-# LANGUAGE RecordWildCards #-}
-module Input (main, chip8Keyboard) where
+module Input (main, eventLatch, chip8Keyboard) where
 
 import Video hiding (main)
 import Utils

@@ -41,7 +41,7 @@ imageROM bs = \i -> let i' = fromIntegral i
     len = BS.length bs
 
 -- chip8 :: forall clk. (Clock clk) => Signal clk (Matrix X16 Bool) -> VGA clk U4 U4 U4
-chip8 prog kbd = (ram, fb, CPUIn{..}, CPUOut{..}, vgaOut)
+chip8 prog (kevent, kbd) = (ram, fb, CPUIn{..}, CPUOut{..}, vgaOut)
   where
     CPUOut{..} = cpu CPUIn{..}
     (fb, fillFB) = ramWithInit nextPair (const low) $ packEnabled (isEnabled cpuFBW) (pack (cpuFBA, enabledVal cpuFBW))
@@ -51,6 +51,7 @@ chip8 prog kbd = (ram, fb, CPUIn{..}, CPUOut{..}, vgaOut)
     cpuFBD = syncRead fb cpuFBA
     cpuStart = bitNot fillRAM .&&. bitNot fillFB
     cpuVBlank = vgaOutVBlank
+    cpuKeyEvent = kevent
     cpuKeys = kbd
 
     -- initROM :: Signal clk Addr -> Signal clk Byte
@@ -69,11 +70,21 @@ testProg = BS.pack [ 0xf1, 0x0a -- WaitKey V1
                    , 0xd0, 0x05 -- Draw V0 V0 5
                    , 0x12, 0x00 -- Jmp 0x200
                    ]
--- initTime = 8194
-initTime = 8204
-(ram, fb, cin, cout, _) = chip8 noKbd
 
-len = 30
+keyInput :: Signal CLK (Enabled (Bool, X16))
+keyInput = toS . mconcat $
+           [ replicate (initTime + 200) Nothing
+           , cycle . concat $
+             replicate 10 [Just (True, 1), Just (False, 1)] ++ replicate 5 [Nothing]
+           ]
+
+initTime = 8192
+fullTime = initTime + 1000
+(ram, fb, cin, cout, _) = chip8 testProg kbd
+  where
+    kbd = (keyInput, eventLatch keyInput)
+
+len = 20
 test = take len . drop initTime . fromS
 
 -- fbTest = take 10 $ drop initTime $ fromS $ fbs
