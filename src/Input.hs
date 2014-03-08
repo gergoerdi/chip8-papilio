@@ -14,7 +14,8 @@ import Data.Sized.Matrix (matrix, Matrix)
 import qualified Data.Sized.Matrix as Matrix
 import Data.Sized.Unsigned as Unsigned
 import Data.Sized.Ix
-import Data.Traversable (forM)
+import Prelude hiding (sequence)
+import Data.Traversable (sequence)
 
 -- TODO: This doesn't work for multi-byte scancodes
 eventPS2 :: (Clock clk)
@@ -49,47 +50,52 @@ decodeEvent keys eevent = packEnabled (en .&&. en') $ pack (pressed, val')
         check :: (n, a) -> Signal clk (Enabled n) -> Signal clk (Enabled n)
         check (i, x) s = combineEnabled s $ packEnabled (val .==. pureS x) (pureS i)
 
+eventLatch :: forall clk n. (Clock clk, Rep n, Size n, Num n)
+           => Signal clk (Enabled (Bool, n))
+           -> Signal clk (Matrix n Bool)
+eventLatch event = runRTL $ do
+    latches <- sequence (Matrix.forAll (const $ newReg False))
+
+    whenEnabled event $ \event -> do
+        let (pressed, key') = unpack event
+        CASE [ IF (key' .==. pureS key) $ r := pressed
+             | (key, r) <- Matrix.assocs latches
+             ]
+
+    return $ pack . fmap reg $ latches
+
 keyboard :: forall clk n. (Clock clk, Size n, Num n, Rep n)
          => Matrix n U8
          -> Signal clk (Enabled (Bool, U8))
          -> Signal clk (Matrix n Bool)
-keyboard keys lastKey = runRTL $ do
-    latches <- forM keys $ \key -> do
-        r <- newReg False
-        return (key, r)
+keyboard keys = eventLatch . decodeEvent keys
 
-    whenEnabled lastKey $ \lastKey -> do
-        let (pressed, code) = unpack lastKey
-        CASE $ Matrix.toList . flip fmap latches $ \(key, r) ->
-          IF (code .==. pureS key) $ r := pressed
+chip8Keycodes :: Matrix X16 U8
+chip8Keycodes = matrix
+    [ 0x22 -- X
 
-    return $ pack $ fmap (reg . snd) latches
+    , 0x16 -- 1
+    , 0x1E -- 2
+    , 0x26 -- 3
+    , 0x15 -- Q
+    , 0x1D -- W
+    , 0x24 -- E
+    , 0x1C -- A
+    , 0x1B -- S
+    , 0x23 -- D
+
+    , 0x1A -- Z
+    , 0x21 -- C
+    , 0x25 -- 4
+    , 0x2D -- R
+    , 0x2B -- F
+    , 0x2A -- V
+    ]
 
 chip8Keyboard :: (Arcade fabric) => fabric (Seq (Matrix X16 Bool))
 chip8Keyboard = do
     (ps2A@PS2{..}, _) <- ps2
-    return $ keyboard codes $ eventPS2 . decodePS2 . samplePS2 $ ps2A
-  where
-    codes :: Matrix X16 U8
-    codes = matrix [ 0x22 -- X
-
-                   , 0x16 -- 1
-                   , 0x1E -- 2
-                   , 0x26 -- 3
-                   , 0x15 -- Q
-                   , 0x1D -- W
-                   , 0x24 -- E
-                   , 0x1C -- A
-                   , 0x1B -- S
-                   , 0x23 -- D
-
-                   , 0x1A -- Z
-                   , 0x21 -- C
-                   , 0x25 -- 4
-                   , 0x2D -- R
-                   , 0x2B -- F
-                   , 0x2A -- V
-                   ]
+    return $ keyboard chip8Keycodes $ eventPS2 . decodePS2 . samplePS2 $ ps2A
 
 testBench :: (Arcade fabric) => fabric ()
 testBench = do
