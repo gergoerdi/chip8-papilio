@@ -34,21 +34,6 @@ data CPUOut clk = CPUOut{ cpuMemA :: Signal clk Addr
                         , cpuWaitPixel :: Signal clk Bool
                         }
 
-foo :: CPUOut CLK
-foo = cpu $ CPUIn{ cpuMemD = funMap prog (cpuMemA foo)
-                 , cpuStart = high
-                 , cpuVBlank = low
-                 , cpuFBD = low
-                 , cpuKeys = pureS (matrix $ replicate 16 False)
-                 }
-  where
-    prog :: Addr -> Maybe Byte
-    prog 0x200 = Just 0x00
-    prog 0x201 = Just 0xe0
-    prog 0x202 = Just 0x00
-    prog 0x203 = Just 0x00
-    prog _ = Nothing
-
 data State = Init
            | Fetch1
            | Fetch2
