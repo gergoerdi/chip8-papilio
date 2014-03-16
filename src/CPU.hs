@@ -123,7 +123,9 @@ cpu CPUIn{..} = runRTL $ do
         vX = registerOf x
         vY = registerOf y
         v0 = registerOf 0x0
+        vF = registerOf 0xf
         (carry, res) = alu op4 vX vY
+        setCarry c = registers ! 0xf := mux c (0, 1)
 
     WHEN cpuVBlank $ do
         timer := mux (reg timer .==. 0) (reg timer - 1, 0)
@@ -163,8 +165,7 @@ cpu CPUIn{..} = runRTL $ do
             doneNext
         move = do
             setRegister x res
-            whenEnabled carry $ \c -> do
-                registers ! 0xf := mux c (0, 1)
+            whenEnabled carry setCarry
             doneNext
         setPtr = do
             ptr := addr
