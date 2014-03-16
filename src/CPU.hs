@@ -4,7 +4,7 @@ module CPU where
 
 import Types
 import Utils
-import ALU (alu, bcd)
+import ALU
 
 import Language.KansasLava
 import Language.KansasLava.Signal.Utils
@@ -125,6 +125,7 @@ cpu CPUIn{..} = runRTL $ do
         v0 = registerOf 0x0
         vF = registerOf 0xf
         (carry, res) = alu op4 vX vY
+        rnd = lfsr high
         setCarry c = registers ! 0xf := mux c (0, 1)
 
     WHEN cpuVBlank $ do
@@ -171,8 +172,7 @@ cpu CPUIn{..} = runRTL $ do
             ptr := addr
             doneNext
         randomize = do
-            -- TODO
-            setRegister x ((vX + 1) .&. imm)
+            setRegister x (rnd .&. imm)
             doneNext
         drawSprite = do
             nextA := reg ptr

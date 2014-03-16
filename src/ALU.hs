@@ -1,6 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables, TypeFamilies #-}
 {-# LANGUAGE RecordWildCards #-}
-module ALU (alu, bcd) where
+module ALU (alu, bcd, lfsr) where
 
 import Language.KansasLava
 import Data.Sized.Matrix (Matrix, matrix)
@@ -56,3 +56,18 @@ bcd = funMap (Just . toBCD)
   where
     toBCD :: U8 -> Matrix X3 U8
     toBCD x = matrix [x `div` 100, (x `div` 10) `mod` 10, x `mod` 10]
+
+lfsr :: forall clk. (Clock clk)
+     => Signal clk Bool
+     -> Signal clk U8
+lfsr step = runRTL $ do
+    r <- newReg (0 :: U15)
+
+    WHEN step $ r := stepLFSR (reg r)
+    return $ unsigned $ reg r
+  where
+    -- http://en.wikipedia.org/wiki/Linear_feedback_shift_register#Some_polynomials_for_maximal_LFSRs
+    -- x^15 + x^14 + 1
+    stepLFSR s = s `shiftR` 1 .|. ((unsigned b) `shiftL` 14)
+      where
+        b = bitNot $ testABit s 0 `xor2` testABit s 1
