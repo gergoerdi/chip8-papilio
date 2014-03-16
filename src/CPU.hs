@@ -21,14 +21,14 @@ import Test.QuickCheck.Gen
 data CPUIn clk = CPUIn{ cpuMemD :: Signal clk Byte
                       , cpuStart :: Signal clk Bool
                       , cpuVBlank :: Signal clk Bool
-                      , cpuFBD :: Signal clk PixData
+                      , cpuFBD :: Signal clk (Enabled PixData)
                       , cpuKeyEvent :: Signal clk (Enabled (Bool, X16))
                       , cpuKeys :: Signal clk (Matrix X16 Bool)
                       }
 
 data CPUOut clk = CPUOut{ cpuMemA :: Signal clk Addr
                         , cpuMemW :: Signal clk (Pipe Addr Byte)
-                        , cpuFBA :: Signal clk (VidX, VidY)
+                        , cpuFBA :: Signal clk (Enabled (VidX, VidY))
                         , cpuFBW :: Signal clk (Enabled PixData)
                         , cpuSound :: Signal clk Bool
                         , cpuOp :: Signal clk (Byte, Byte)
@@ -102,14 +102,14 @@ cpu CPUIn{..} = runRTL $ do
     nextA <- newReg 0x000
     nextW <- newReg 0
 
-    nextFBA <- newReg (0, 0)
+    nextFBA <- newReg Nothing
     -- drawOrigin <- newReg (0 :: VidX, 0 :: VidY)
     drawX <- newReg (0 :: U3)
     drawY <- newReg (0 :: U4)
     drawPattern <- newReg (0 :: Byte)
     waitPattern <- newReg False
     waitPixel <- newReg False
-    nextPixel <- newReg False
+    nextPixel <- newReg Nothing
 
     opHi <- newReg 0
     opLo <- newReg 0
@@ -120,7 +120,7 @@ cpu CPUIn{..} = runRTL $ do
 
     let x = unsigned op2
         y = unsigned op3
-        vX = registerOf x
+        vX = registerOf (x :: Signal clk X16)
         vY = registerOf y
         v0 = registerOf 0x0
         vF = registerOf 0xf
@@ -142,8 +142,8 @@ cpu CPUIn{..} = runRTL $ do
         skipIf p = CASE [ IF p doneSkip, OTHERWISE doneNext ]
 
     let clearScreen = do
-            nextFBA := pureS minBound
-            nextPixel := low
+            nextFBA := enabledS $ pureS minBound
+            nextPixel := enabledS low
             s := pureS ClearFB
         ret = do
             sp := reg sp - 1
@@ -176,7 +176,7 @@ cpu CPUIn{..} = runRTL $ do
             doneNext
         drawSprite = do
             nextA := reg ptr
-            nextFBA := pack (unsigned vX, unsigned vY)
+            nextFBA := enabledS $ pack (unsigned vX, unsigned vY)
             waitPattern := high
             waitPixel := high
             drawX := 0
@@ -221,6 +221,8 @@ cpu CPUIn{..} = runRTL $ do
                  r := 0
              WHEN cpuStart done
       , Fetch1 ==> do
+             nextFBA := disabledS
+             nextPixel := disabledS
              nextA := reg pc
              s := pureS Fetch2
       , Fetch2 ==> do
@@ -282,8 +284,9 @@ cpu CPUIn{..} = runRTL $ do
                      setRegister x $ unsigned key
                      doneNext
       , ClearFB ==> do
-             nextFBA := nextPair (reg nextFBA)
-             WHEN (reg nextFBA .==. pureS maxBound) doneNext
+             let fbA = enabledVal $ reg nextFBA
+             nextFBA := enabledS $ nextPair fbA
+             WHEN (fbA .==. pureS maxBound) doneNext
       , Draw ==> do
              let x = reg drawX
                  y = reg drawY
@@ -291,24 +294,28 @@ cpu CPUIn{..} = runRTL $ do
                  newLine = x .==. pureS maxBound
                  y' = mux newLine (y, y + 1)
              CASE [ IF (reg waitPixel) $ do
+                         nextPixel := disabledS
                          waitPixel := low
                          WHEN (reg waitPattern) $ do
                              drawPattern := cpuMemD
                              waitPattern := low
-                  , OTHERWISE $ do
+                  , OTHERWISE $ whenEnabled cpuFBD $ \oldPixel -> do
                          drawX := x'
                          drawY := y'
                          WHEN newLine $ do
                              nextA := reg nextA + 1
                              waitPattern := high
-                         nextPixel := (reg drawPattern `testABit` 7) `xor2` cpuFBD
+
+                         let thisPixel = reg drawPattern `testABit` 7
+                         nextPixel := enabledS $ thisPixel `xor2` oldPixel
+                         setCarry $ (vF ./=. 0) .||. (thisPixel .&&. oldPixel)
+
                          waitPixel := high
                          drawPattern := reg drawPattern `shiftL` 1
-                         nextFBA := pack (unsigned $ vX + unsigned x', unsigned $ vY + unsigned y')
+                         nextFBA := enabledS $ pack (unsigned vX + unsigned x', unsigned vY + unsigned y')
+                         WHEN (y' .==. op4) doneNext
                   ]
 
-             -- TODO: set vF from cpuFBD
-             WHEN (y' .==. op4) doneNext
       , WriteMem ==> CASE
           [ match (reg regsIdx) $ \i -> do
                  nextA := reg nextA + 1
@@ -346,7 +353,7 @@ cpu CPUIn{..} = runRTL $ do
         cpuFBA = reg nextFBA
         cpuSound = reg sound ./=. 0
         cpuMemW = packEnabled (reg s .==. pureS WriteMem) $ pack (reg nextA, var nextW)
-        cpuFBW =  packEnabled (bitNot (reg waitPixel) .&&. (reg s .==. pureS Draw .||. reg s .==. pureS ClearFB)) (var nextPixel)
+        cpuFBW = var nextPixel
 
         cpuOp = pack (reg opHi, var opLo)
         cpuWaitPixel = reg waitPixel

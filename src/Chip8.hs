@@ -44,11 +44,12 @@ imageROM bs = \i -> let i' = fromIntegral i
 chip8 prog (kevent, kbd) = (ram, fb, CPUIn{..}, CPUOut{..}, vgaOut)
   where
     CPUOut{..} = cpu CPUIn{..}
-    (fb, fillFB) = ramWithInit nextPair (const low) $ packEnabled (isEnabled cpuFBW) (pack (cpuFBA, enabledVal cpuFBW))
+    (fb, fillFB) = ramWithInit nextPair (const low) $
+                   packEnabled (isEnabled cpuFBA .&&. isEnabled cpuFBW) $
+                   pack (enabledVal cpuFBA, enabledVal cpuFBW)
     (ram, fillRAM) = ramWithInit (+1) initROM cpuMemW
 
     cpuMemD = syncRead ram cpuMemA
-    cpuFBD = syncRead fb cpuFBA
     cpuStart = bitNot fillRAM .&&. bitNot fillFB
     cpuVBlank = vgaOutVBlank
     cpuKeyEvent = kevent
@@ -58,7 +59,8 @@ chip8 prog (kevent, kbd) = (ram, fb, CPUIn{..}, CPUOut{..}, vgaOut)
     initROM :: Signal CLK Addr -> Signal CLK Byte
     initROM = flip rom $ Just . imageROM (linkProg prog)
 
-    VGADriverOut{..} = vgaFB fb
+    (vgaD, cpuFBD) = syncReadBus fb (vgaPos, cpuFBA)
+    (vgaPos, VGADriverOut{..}) = vgaFB vgaD
 
 noKbd :: Signal CLK (Matrix X16 Bool)
 noKbd = pureS $ matrix $ replicate 16 False

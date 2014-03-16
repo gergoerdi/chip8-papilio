@@ -4,6 +4,7 @@ module Utils
        , nextPair
        , combineEnabled
        , newRegs, setIdx, regIdx, varIdx
+       , syncReadBus
        ) where
 
 import Language.KansasLava
@@ -78,3 +79,17 @@ regIdx regs idx = pack (fmap reg regs) .!. idx
 varIdx :: (Clock clk, Rep a, Rep n, Size n)
        => Matrix n (Reg s clk a) -> Signal clk n -> Signal clk a
 varIdx regs idx = pack (fmap var regs) .!. idx
+
+syncReadBus :: (Clock clk, Rep a, Size a, Rep d)
+            => Signal clk (a -> d)
+            -> (Signal clk (Enabled a), Signal clk (Enabled a))
+            -> (Signal clk d, Signal clk (Enabled d))
+syncReadBus ram (a1, a2) = runRTL $ do
+    choose2 <- newReg False
+    choose2 := bitNot en1
+    return (d, packEnabled (reg choose2) d)
+  where
+    (en1, a1') = unpackEnabled a1
+    (en2, a2') = unpackEnabled a2
+    a = mux en1 (mux en2 (minBound, a2'), a1')
+    d = syncRead ram a

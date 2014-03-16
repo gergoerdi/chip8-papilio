@@ -22,13 +22,13 @@ import Data.Bits
 import System.FilePath
 import System.Directory
 
-type FrameBuffer = (VidX, VidY) -> PixData
-
 drive64x32 :: (Clock clk)
-           => VGADriverIn clk Bool () () -> VGADriverOut clk (W VidX) (W VidY) U4 U4 U4
-drive64x32 VGADriverIn{..} = VGADriverOut{ vgaOutX = x'
-                                         , vgaOutY = y'
-                                         , ..}
+           => VGADriverIn clk Bool () ()
+           -> (Signal clk Bool, VGADriverOut clk (W VidX) (W VidY) U4 U4 U4)
+drive64x32 VGADriverIn{..} = (newPixel,
+                              VGADriverOut{ vgaOutX = x'
+                                          , vgaOutY = y'
+                                          , ..})
   where
     VGADriverOut{..} = driveVGA vga640x480at60 (VGADriverIn r g b)
 
@@ -42,6 +42,8 @@ drive64x32 VGADriverIn{..} = VGADriverOut{ vgaOutX = x'
     x' = mapEnabled (\x -> signed $ (x - 64) `shiftR` 3) vgaOutX
     y' = mapEnabled (\y -> signed $ (y - 112) `shiftR` 3) vgaOutY
 
+    newPixel = bitNot vgaOutClkPhase .&&. inField .&&. ((x - 64) .&. 0x7 .==. 0)
+
     pixel = vgaInR
     r = mux inField (maxBound, spread pixel)
     g = mux inField (minBound, spread pixel)
@@ -50,23 +52,29 @@ drive64x32 VGADriverIn{..} = VGADriverOut{ vgaOutX = x'
     spread s = mux s (minBound, maxBound)
 
 vgaFB :: forall clk. (Clock clk)
-      => Signal clk FrameBuffer
-      -> VGADriverOut clk (W VidX) (W VidY) U4 U4 U4
-vgaFB fb = vga
+      => Signal clk PixData
+      -> (Signal clk (Enabled (VidX, VidY)), VGADriverOut clk (W VidX) (W VidY) U4 U4 U4)
+vgaFB pixel = (packEnabled newPixel pos, vga)
   where
-    vga@VGADriverOut{..} = drive64x32 VGADriverIn{..}
+    (newPixel, vga@VGADriverOut{..}) = drive64x32 VGADriverIn{..}
 
-    vgaInR = pixel
+    vgaInR = pixel'
     vgaInG = pureS ()
     vgaInB = pureS ()
 
-    x = enabledVal vgaOutX
-    y = enabledVal vgaOutY
+    x = let (en, v) = unpackEnabled vgaOutX in mux en (0, v)
+    y = let (en, v) = unpackEnabled vgaOutY in mux en (0, v)
 
     pos :: Signal clk (VidX, VidY)
     pos = pack (x, y)
 
-    pixel = syncRead fb pos
+    pixel' = runRTL $ do
+        prevNewPixel <- newReg False
+        prevNewPixel := newPixel
+
+        p <- newReg False
+        WHEN (reg prevNewPixel) $ p := pixel
+        return (var p)
 
 testBench :: (Arcade fabric) => fabric ()
 testBench = do
@@ -112,8 +120,14 @@ testBench = do
 
             return $ packEnabled (reg we) $ pack (cursor, reg d)
         (fb, _) = ramWithInit nextPair (rom `flip` initImage) writeFB
+        (fbA, vgaS) = vgaFB fbPixel
 
-    vga . encodeVGA . vgaOut $ vgaFB fb
+        fbNextPixel = packEnabled (isEnabled fbA) $
+                      mux (isEnabled fbA) (low, syncRead fb $ enabledVal fbA)
+
+        fbPixel = registerEnabled False fbNextPixel
+
+    vga . encodeVGA . vgaOut $ vgaS
   where
     initImage (x, y) = Just $ x `elem` [minBound, maxBound]
                             || y `elem` [minBound, maxBound]
