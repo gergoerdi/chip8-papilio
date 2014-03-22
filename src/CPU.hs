@@ -181,6 +181,7 @@ cpu CPUIn{..} = runRTL $ do
             waitPixel := high
             drawX := 0
             drawY := 0
+            setCarry low
             s := pureS Draw
         getTimer = do
             setRegister x (reg timer)
