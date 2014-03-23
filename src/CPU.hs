@@ -31,11 +31,16 @@ data CPUOut clk = CPUOut{ cpuMemA :: Signal clk Addr
                         , cpuFBA :: Signal clk (Enabled (VidX, VidY))
                         , cpuFBW :: Signal clk (Enabled PixData)
                         , cpuSound :: Signal clk Bool
-                        , cpuOp :: Signal clk (Byte, Byte)
-                        , cpuState :: Signal clk State
-                        , cpuWaitPixel :: Signal clk Bool
                         }
 
+data CPUDebug clk = CPUDebug{ cpuOp :: Signal clk (Byte, Byte)
+                            , cpuState :: Signal clk State
+                            , cpuWaitPixel :: Signal clk Bool
+                            , cpuAddr :: Signal clk Addr
+                            , cpuNextPixels :: Signal clk Byte
+                            , cpuPtr :: Signal clk Addr
+                            , cpuRegs :: Signal clk (Matrix X16 Byte)
+                            }
 data State = Init
            | Fetch1
            | Fetch2
@@ -81,7 +86,7 @@ nybbles sig = (hi, lo)
     hi = unsigned $ sig `shiftR` 4
     lo = unsigned $ sig
 
-cpu :: forall clk. (Clock clk) => CPUIn clk -> CPUOut clk
+cpu :: forall clk. (Clock clk) => CPUIn clk -> (CPUOut clk, CPUDebug clk)
 cpu CPUIn{..} = runRTL $ do
     registers <- newRegs (Matrix.forAll (const 0))
     let registerOf = regIdx registers
@@ -359,8 +364,12 @@ cpu CPUIn{..} = runRTL $ do
         cpuOp = pack (reg opHi, var opLo)
         cpuWaitPixel = reg waitPixel
         cpuState = reg s
+        cpuAddr = addr
+        cpuNextPixels = reg drawPattern
+        cpuPtr = reg ptr
+        cpuRegs = pack $ Matrix.forAll (registerOf . pureS)
 
-    return $ CPUOut{..}
+    return (CPUOut{..}, CPUDebug{..})
 
 switch :: (Eq a, Rep a, sig ~ Signal c) => sig a -> [(Maybe a, RTL s c ())] -> RTL s c ()
 switch r = CASE . map (uncurry $ maybe OTHERWISE toIF)
