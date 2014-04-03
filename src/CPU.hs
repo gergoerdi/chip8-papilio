@@ -31,6 +31,7 @@ data CPUOut clk = CPUOut{ cpuMemA :: Signal clk Addr
                         , cpuFBA :: Signal clk (Enabled (VidX, VidY))
                         , cpuFBW :: Signal clk (Enabled PixData)
                         , cpuSound :: Signal clk Bool
+                        , cpuClearKey :: Signal clk (Enabled X16)
                         }
 
 data CPUDebug clk = CPUDebug{ cpuOp :: Signal clk (Byte, Byte)
@@ -115,6 +116,7 @@ cpu CPUIn{..} = runRTL $ do
     waitPattern <- newReg False
     waitPixel <- newReg False
     nextPixel <- newReg Nothing
+    clearKey <- newReg Nothing
 
     opHi <- newReg 0
     opLo <- newReg 0
@@ -229,6 +231,7 @@ cpu CPUIn{..} = runRTL $ do
       , Fetch1 ==> do
              nextFBA := disabledS
              nextPixel := disabledS
+             clearKey := disabledS
              nextA := reg pc
              s := pureS Fetch2
       , Fetch2 ==> do
@@ -266,11 +269,13 @@ cpu CPUIn{..} = runRTL $ do
                , 0xb ==> jmp (unsigned v0 + addr)
                , 0xc ==> randomize
                , 0xd ==> drawSprite
-               , 0xe ==> switch (var opLo)
-                 [ 0x9e ==> skipIf (cpuKeys .!. unsigned vX)
-                 , 0xa1 ==> skipIf (bitNot $ cpuKeys .!. unsigned vX)
-                 , oTHERWISE halt
-                 ]
+               , 0xe ==> do
+                   switch (var opLo)
+                     [ 0x9e ==> skipIf (cpuKeys .!. unsigned vX)
+                     , 0xa1 ==> skipIf (bitNot $ cpuKeys .!. unsigned vX)
+                     , oTHERWISE halt
+                     ]
+                   clearKey := enabledS (unsigned vX)
                , 0xf ==> switch (var opLo)
                  [ 0x07 ==> getTimer
                  , 0x0a ==> waitKey
@@ -360,6 +365,7 @@ cpu CPUIn{..} = runRTL $ do
         cpuSound = reg sound ./=. 0
         cpuMemW = packEnabled (reg s .==. pureS WriteMem) $ pack (reg nextA, var nextW)
         cpuFBW = var nextPixel
+        cpuClearKey = reg clearKey
 
         cpuOp = pack (reg opHi, var opLo)
         cpuWaitPixel = reg waitPixel

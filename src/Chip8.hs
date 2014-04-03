@@ -57,7 +57,12 @@ chip8 prog (kevent, kbd) = (cpuDebug, vgaOut)
     cpuStart = bitNot fillRAM .&&. bitNot fillFB
     cpuVBlank = vgaOutVBlank
     cpuKeyEvent = kevent
-    cpuKeys = kbd
+    cpuKeys = eventLatchRelease inputTimer cpuClearKey kbd
+      where
+        inputTimer = runRTL $ do
+            r <- newReg (0 :: U2)
+            WHEN vgaOutVBlank $ r := reg r + 1
+            return $ vgaOutVBlank .&&. (reg r .==. 0)
 
     initROM :: Signal clk Addr -> Signal clk Byte
     initROM = flip rom $ Just . imageROM (linkProg prog)
@@ -68,7 +73,8 @@ chip8 prog (kevent, kbd) = (cpuDebug, vgaOut)
 main :: IO ()
 main = do
     -- [filename] <- getArgs
-    let filename = "/home/cactus/prog/haskell/chip8/import/CHIP8/GAMES/HIDDEN"
+    -- let filename = "/home/cactus/prog/haskell/chip8/games/2048/2048.ch8"
+    let filename = "/home/cactus/prog/haskell/chip8/import/CHIP8/GAMES/TETRIS"
     prog <- BS.readFile filename
     emitBench "Chip8" $ do
         kbd <- chip8Keyboard

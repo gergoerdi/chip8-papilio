@@ -1,6 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables, TypeFamilies #-}
 {-# LANGUAGE RecordWildCards #-}
-module Input (main, eventLatch, chip8Keyboard) where
+module Input (main, eventLatch, eventLatchRelease, chip8Keyboard) where
 
 import Video hiding (main)
 import Utils
@@ -14,8 +14,9 @@ import Data.Sized.Matrix (matrix, Matrix)
 import qualified Data.Sized.Matrix as Matrix
 import Data.Sized.Unsigned as Unsigned
 import Data.Sized.Ix
-import Prelude hiding (sequence)
+import Prelude hiding (sequence, sequence_)
 import Data.Traversable (sequence)
+import Data.Foldable (sequence_)
 
 -- TODO: This doesn't work for multi-byte scancodes
 eventPS2 :: (Clock clk)
@@ -63,6 +64,20 @@ eventLatch event = runRTL $ do
              ]
 
     return $ pack . fmap reg $ latches
+
+eventLatchRelease :: forall clk n. (Clock clk, Rep n, Size n, Num n)
+                  => Signal clk Bool
+                  -> Signal clk (Enabled n)
+                  -> Signal clk (Matrix n Bool)
+                  -> Signal clk (Matrix n Bool)
+eventLatchRelease timer release latches = runRTL $ do
+    regs <- sequence (Matrix.forAll (const $ newReg False))
+
+    CASE [ IF timer $ do
+                sequence_ $ Matrix.zipWith (:=) regs (unpack latches)
+         , match release $ \i -> setIdx regs i low
+         ]
+    return $ pack . fmap reg $ regs
 
 chip8Keycodes :: Matrix X16 U8
 chip8Keycodes = matrix
