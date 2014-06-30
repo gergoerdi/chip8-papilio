@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables, TypeFamilies #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
-module Chip8 where
+module Main where
 
 import Types
 import Video hiding (main)

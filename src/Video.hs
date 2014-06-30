@@ -149,7 +149,7 @@ emitBench modName bench = do
   where
     clock = "CLK_50MHZ"
 
-    outPath = ".." </> "ise" </> "gensrc"
+    outPath = "ise" </> "gensrc"
     outVHDL name = outPath </> name <.> "vhdl"
 
 main :: IO ()

@@ -37,7 +37,7 @@ $(MAIN).xise: Makefile xise.in
 
 
 $(LAVA_VHDLS): $(HS_SRCS)
-	$(RUNGHC) -i$(LAVADIR) $(LAVADIR)/$(MAIN).hs
+	cd $(TOPDIR) && $(CABAL) run $(EXE)
 
 $(MAIN).prj: Makefile
 	echo $(foreach VHDL_SRC,$(VHDLS),'vhdl work "$(VHDL_SRC)"\n') > $@
