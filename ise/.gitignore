@@ -9,9 +9,12 @@ iseconfig
 *.bit
 *.bld
 *.drc
+*.map
+*.mrp
 *.ncd
 *.ngc
 *.ngd
+*.ngm
 *.ngr
 *.pad
 *.par
@@ -53,3 +56,4 @@ xst
 ngo
 _xmsgs
 
+.shake.database

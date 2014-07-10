@@ -31,12 +31,13 @@ main = do
             Nothing -> error "renderTemplate failed"
             Just (builder, _mimeType) -> toByteString builder
 
+    setCurrentDirectory "ise"
+
     shakeArgs shakeOptions $ do
-        want [ out $ mod <.> "bit" ]
-        want [ out $ xawsrc $ xaw <.> "vhdl" | xaw <- xaws ]
+        want [ mod <.> "bit" ]
 
         let textTemplate ext replacements = do
-                out ("*" <.> ext) *> \target -> do
+                ("*" <.> ext) *> \target -> do
                     let fileName = templateFile $ ext <.> "in"
                     need [fileName]
                     let subs = [ "s/@" <> binder <> "@/" <> binding <> "/g;"
@@ -46,7 +47,7 @@ main = do
                     cmd ("sed -n -e" :: String) [sed, fileName]
 
             heistTemplate ext splices = do
-                out ("*" <.> ext) *> \target -> do
+                ("*" <.> ext) *> \target -> do
                     liftIO $ BS.writeFile target $ heist (fromString $ ext) splices
 
         textTemplate "ut" []
@@ -59,91 +60,92 @@ main = do
                                          , concatMap xiseXAW xaws
                                          ])
 
-        out "*.prj" *> \target -> do
+        "*.prj" *> \target -> do
             let vhdlWork baseName = mconcat ["vhdl work \"", baseName <.> "vhdl", "\""]
             liftIO $ writeFile target . unlines $
               map (vhdlWork . gensrc) vhdls ++ map (vhdlWork . xawsrc) xaws
 
-        out (xawsrc "*.vhdl") *> \target -> do
+        xawsrc "*.vhdl" *> \target -> do
             let xaw = ipcore $ takeBaseName target <.> "xaw"
-            need [out xaw]
-            xilinx "xaw2vhdl" [xaw, "-st", "XST", dropDirectory1 target]
-        out (xawsrc "*.ucf") *> \target -> need [target -<.> "vhdl"]
+            need [xaw]
+            xilinx "xaw2vhdl" [xaw, "-st", "XST", target]
+        xawsrc "*.ucf" *> \target -> need [target -<.> "vhdl"]
 
-        out ("xst" </> "projnav.tmp") *> liftIO . createDirectoryIfMissing True
+        "xst/projnav.tmp" *> liftIO . createDirectoryIfMissing True
 
-        out "*.ngc" *> \target -> do
+        "*.ngc" *> \target -> do
             need $
               (target -<.> "prj"):
               (target -<.> "xst"):
-              (out $ "xst" </> "projnav.tmp"):
-              [out . gensrc $ f <.> "vhdl" | f <- vhdls]
-            xilinx "xst" [ "-ifn", dropDirectory1 target -<.> "xst"
-                         , "-ofn", dropDirectory1 target -<.> "syr"
+              ("xst" </> "projnav.tmp"):
+              [gensrc $ f <.> "vhdl" | f <- vhdls] ++
+              [xawsrc $ f <.> "vhdl" | f <- xaws]
+            xilinx "xst" [ "-ifn", target -<.> "xst"
+                         , "-ofn", target -<.> "syr"
                          ]
 
-        out "*.ngd" *> \target -> do
+        "*.ngd" *> \target -> do
             let ucf = gensrc $ mod <.> "ucf"
-            need [ target -<.> "ngc", out ucf
-                 , out $ "xst" </> "projnav.tmp"
+            need [ target -<.> "ngc"
+                 , ucf
+                 , "xst/projnav.tmp"
                  ]
             xilinx "ngdbuild" [ "-dd", "ngo"
                               , "-nt", "timestamp"
                               , "-uc", ucf
                               , "-p", fpga
-                              , dropDirectory1 target -<.> "ngc"
-                              , dropDirectory1 target
+                              , target -<.> "ngc"
+                              , target
                               ]
 
-        out "*.pcf" *> \target -> do
+        "*.pcf" *> \target -> do
             need [ target -<.> "ngc"
                  , target -<.> "ngd"
-                 , out $ "xst" </> "projnav.tmp"
+                 , "xst/projnav.tmp"
                  ]
             xilinx "map" [ "-p", fpga
                          , "-cm", "area"
                          , "-ir", "off"
                          , "-pr", "off"
                          , "-c", "100"
-                         , "-o", dropDirectory1 (mapFileName (<> "_map") target -<.> "ncd")
-                         , dropDirectory1 target -<.> "ngd"
-                         , dropDirectory1 target -<.> "pcf"
+                         , "-o", mapFileName (<> "_map") target -<.> "ncd"
+                         , target -<.> "ngd"
+                         , target -<.> "pcf"
                          ]
         alternatives $ do
-            out "*_map.ncd" *> \target -> need [mapFileName (fromJust . stripSuffix "_map") target -<.> "pcf"]
+            "*_map.ncd" *> \target -> need [mapFileName (fromJust . stripSuffix "_map") target -<.> "pcf"]
 
-            out "*.ncd" *> \target -> do
-                need [ out $ "xst" </> "projnav.tmp"
+            "*.ncd" *> \target -> do
+                need [ "xst" </> "projnav.tmp"
                      , target -<.> "pcf"
                      ]
                 xilinx "par" [ "-w"
                              , "-ol", "high"
                              , "-t", "1"
-                             , dropDirectory1 (mapFileName (<> "_map") target) -<.> "ncd"
-                             , dropDirectory1 target -<.> "ncd"
-                             , dropDirectory1 target -<.> "pcf"
+                             , mapFileName (<> "_map") target -<.> "ncd"
+                             , target -<.> "ncd"
+                             , target -<.> "pcf"
                              ]
 
-        out "*.bit" *> \target -> do
-            need [ out $ "xst" </> "projnav.tmp"
+        "*.bit" *> \target -> do
+            need [ "xst/projnav.tmp"
                  , target -<.> "ut"
                  , target -<.> "ncd"
                  ]
-            xilinx "bitgen" [ "-f", dropDirectory1 target -<.> "ut"
-                            , dropDirectory1 target -<.> "ncd"
+            xilinx "bitgen" [ "-f", target -<.> "ut"
+                            , target -<.> "ncd"
                             ]
   where
     xilinxRoot = "/home/cactus/prog/fpga/Xilinx/14.2/ISE_DS/ISE/bin/lin64"
-    xilinx tool args = cmd (Cwd "ise2") (xilinxRoot </> tool) args
+    xilinx tool args = cmd (xilinxRoot </> tool) args
 
     fpga = "XC3S500E-VQ100-5"
 
-    out f = "ise2" </> f
     ipcore f = "ipcore_dir" </> f
     gensrc f = "gensrc" </> f
     xawsrc f = gensrc $ "xaw" </> f
 
-    templateFile f = "ise.template" </> f
+    templateFile f = ".." </> "ise.template" </> f
 
     mod = "Chip8"
     vhdls = [mod, "lava-prelude"]
