@@ -68,6 +68,7 @@ main = do
         xawsrc "*.vhdl" *> \target -> do
             let xaw = ipcore $ takeBaseName target <.> "xaw"
             need [xaw]
+            removeFilesAfter "." ["xaw2vhdl.log"]
             xilinx "xaw2vhdl" [xaw, "-st", "XST", target]
         xawsrc "*.ucf" *> \target -> need [target -<.> "vhdl"]
 
@@ -80,16 +81,30 @@ main = do
               ("xst" </> "projnav.tmp"):
               [gensrc $ f <.> "vhdl" | f <- vhdls] ++
               [xawsrc $ f <.> "vhdl" | f <- xaws]
+
+            removeFilesAfter "."
+              [ "xst//*"
+              , "_xmsgs//*"
+              , target -<.> "lso"
+              , target -<.> "ngr"
+              , target -<.> "syr"
+              , "*.xrpt"
+              ]
             xilinx "xst" [ "-ifn", target -<.> "xst"
                          , "-ofn", target -<.> "syr"
                          ]
-
         "*.ngd" *> \target -> do
             let ucf = gensrc $ mod <.> "ucf"
             need [ target -<.> "ngc"
                  , ucf
                  , "xst/projnav.tmp"
                  ]
+            removeFilesAfter "."
+              [ target -<.> "bld"
+              , "ngo//*"
+              , "xlnx_auto_0_xdb//*"
+              , "*.xrpt"
+              ]
             xilinx "ngdbuild" [ "-dd", "ngo"
                               , "-nt", "timestamp"
                               , "-uc", ucf
@@ -103,6 +118,13 @@ main = do
                  , target -<.> "ngd"
                  , "xst/projnav.tmp"
                  ]
+            removeFilesAfter "."
+              [ "*_summary.xml"
+              , "*_usage.xml"
+              , target -<.> "ngm"
+              , target -<.> "mrp"
+              , target -<.> "map"
+              ]
             xilinx "map" [ "-p", fpga
                          , "-cm", "area"
                          , "-ir", "off"
@@ -119,6 +141,17 @@ main = do
                 need [ "xst" </> "projnav.tmp"
                      , target -<.> "pcf"
                      ]
+                removeFilesAfter "."
+                  [ "*_pad.txt"
+                  , "*_pad.xrpt"
+                  , "*_pad.csv"
+                  , "_xmsgs//*"
+                  , target -<.> "pad"
+                  , target -<.> "par"
+                  , target -<.> "xpi"
+                  , target -<.> "unroutes"
+                  , target -<.> "ptwx"
+                  ]
                 xilinx "par" [ "-w"
                              , "-ol", "high"
                              , "-t", "1"
@@ -132,6 +165,13 @@ main = do
                  , target -<.> "ut"
                  , target -<.> "ncd"
                  ]
+            removeFilesAfter "."
+              [ "*_bitgen.xwbt"
+              , "usage_statistics_webtalk.html"
+              , "webtalk.log"
+              , target -<.> "bgn"
+              , target -<.> "drc"
+              ]
             xilinx "bitgen" [ "-f", target -<.> "ut"
                             , target -<.> "ncd"
                             ]
