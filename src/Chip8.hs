@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables, TypeFamilies #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
-module Main where
+module Chip8 (bench, main) where
 
 import Types
 import Video hiding (main)
@@ -70,18 +70,21 @@ chip8 prog (kevent, kbd) = (cpuDebug, vgaOut)
     (vgaD, cpuFBD) = syncReadBus fb (vgaPos, cpuFBA)
     (vgaPos, VGADriverOut{..}) = vgaFB vgaD
 
+bench :: ByteString -> Fabric ()
+bench prog = do
+    kbd <- chip8Keyboard
+    let (CPUDebug{..}, vgaOut) = chip8 prog kbd
+    vga . encodeVGA $ vgaOut
+    leds $ matrix [ cpuState .==. pureS Halt
+                  , cpuState .==. pureS ClearFB
+                  , cpuState .==. pureS WaitKey
+                  , cpuState .==. pureS Draw
+                  ]
+
 main :: IO ()
 main = do
     -- [filename] <- getArgs
     -- let filename = "/home/cactus/prog/haskell/chip8/games/2048/2048.ch8"
     let filename = "/home/cactus/prog/haskell/chip8/import/CHIP8/GAMES/TETRIS"
     prog <- BS.readFile filename
-    emitBench "Chip8" $ do
-        kbd <- chip8Keyboard
-        let (CPUDebug{..}, vgaOut) = chip8 prog kbd
-        vga . encodeVGA $ vgaOut
-        leds $ matrix [ cpuState .==. pureS Halt
-                      , cpuState .==. pureS ClearFB
-                      , cpuState .==. pureS WaitKey
-                      , cpuState .==. pureS Draw
-                      ]
+    emitBench "Chip8" $ bench prog

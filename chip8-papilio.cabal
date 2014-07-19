@@ -14,7 +14,7 @@ cabal-version:       >=1.10
 
 executable chip8-papilio
   hs-source-dirs:      src
-  main-is:             Chip8.hs
+  main-is:             Build.hs
   -- other-modules:
   build-depends:
         base >=4.7 && < 5,
@@ -26,7 +26,8 @@ executable chip8-papilio
         directory,
         netlist >=0.3 && <0.4,
         QuickCheck,
-        bytestring
+        bytestring,
+        shake
   default-language:    Haskell2010
   other-extensions:    ScopedTypeVariables, RecordWildCards, FlexibleInstances, TypeFamilies, NoMonomorphismRestriction
   Ghc-Options:         -Werror -fwarn-unused-imports -fwarn-unused-matches

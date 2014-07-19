@@ -6,26 +6,20 @@ import Development.Shake
 import Development.Shake.FilePath
 import System.Directory
 
-import Heist
-import Heist.Interpreted
-
-import qualified Text.XmlHtml as X
-
-import Control.Monad.Identity
-import Control.Monad.Trans.Either
 import Data.Monoid
-import Data.String
 import Data.List (stripPrefix)
 import Data.Maybe (fromJust)
-
-import Blaze.ByteString.Builder
 import qualified Data.ByteString as BS
-import Data.ByteString (ByteString)
 
+import Language.KansasLava.VHDL (writeVhdlPrelude)
+import qualified Chip8
+import Video (synthesize)
+
+lavaRules :: FilePath -> String -> String -> Rules ()
 lavaRules modName vhdl ucf = do
     gensrc modName <.> "vhdl" *> \target -> writeFileChanged target vhdl
     gensrc modName <.> "ucf" *> \target -> writeFileChanged target ucf
-    -- gensrc "lava-prelude.vhdl" *>
+    gensrc "lava-prelude.vhdl" *> liftIO . writeVhdlPrelude
   where
     gensrc f = "gensrc" </> f
 
@@ -34,17 +28,12 @@ data XilinxConfig = XilinxConfig{ xilinxRoot :: FilePath
                                 }
 
 xilinxRules :: XilinxConfig
-            -> (ByteString -> Splices (Splice Identity) -> ByteString)
             -> String
             -> [String]
             -> Rules ()
-xilinxRules XilinxConfig{..} heist mod xaws = do
+xilinxRules XilinxConfig{..} mod xaws = do
     textTemplate "ut" []
     textTemplate "xst" [("MAIN", mod), ("TOP", mod)]
-    heistTemplate "xise" $
-      "lava-files" ## return (concat [ concatMap xiseVHDL vhdls
-                                     , concatMap xiseXAW xaws
-                                     ])
 
     "*.prj" *> \target -> do
         let vhdlWork baseName = mconcat ["vhdl work \"", baseName <.> "vhdl", "\""]
@@ -184,57 +173,26 @@ xilinxRules XilinxConfig{..} heist mod xaws = do
             let sed = mconcat subs <> "w" <> target
             cmd ("sed -n -e" :: String) [sed, fileName]
 
-    heistTemplate ext splices = do
-        ("*" <.> ext) *> \target -> do
-            liftIO $ BS.writeFile target $ heist (fromString $ ext) splices
-
-xiseVHDL :: FilePath -> [X.Node]
-xiseVHDL mod =
-    [ X.Element "file" [("xil_pn:name", fromString $ mod <.> "vhdl")]
-      [ X.Element "association" [("xil_pn:name", "BehavioralSimulation")] []
-      , X.Element "association" [("xil_pn:name", "Implementation")] []
-      ]
-    ]
-
-xiseXAW :: FilePath -> [X.Node]
-xiseXAW mod =
-    [ X.Element "file" [ ("xil_pn:name", fromString $ mod <.> "xaw")
-                       , ("xil_pn:type", "FILE_XAW")
-                       ]
-      [ X.Element "association" [("xil_pn:name", "BehavioralSimulation")] []
-      , X.Element "association" [("xil_pn:name", "Implementation")] []
-      ]
-    ]
-
 main :: IO ()
 main = do
-    heist <- do
-        heist <- runEitherT $ initHeist heistConfig
-        hs <- case heist of
-            Left errs -> error $ unlines ("Initializing Heist failed:":errs)
-            Right hs -> return hs
-        return $ \templateName splices -> case runIdentity $ renderTemplate (bindSplices splices hs) templateName of
-            Nothing -> error "renderTemplate failed"
-            Just (builder, _mimeType) -> toByteString builder
-
     setCurrentDirectory "ise"
 
+    let filename = "/home/cactus/prog/haskell/chip8/import/CHIP8/GAMES/TETRIS"
+    prog <- BS.readFile filename
+    (vhdl, ucf) <- synthesize modName (Chip8.bench prog)
+
     shakeArgs shakeOptions $ do
-        -- want [ mod <.> "bit" ]
-        want [ "gensrc/foo.vhdl" ]
-        lavaRules "foo" "VHDL" "UCF"
+        want [ modName <.> "bit" ]
 
-        -- xilinxRules xilinxConfig heist mod xaws
+        lavaRules modName vhdl ucf
+        xilinxRules xilinxConfig modName xaws
   where
-    heistConfig =
-        mempty{ hcTemplateLocations = [loadTemplates "ise.template"] }
-
     xilinxConfig =
         XilinxConfig{ xilinxRoot = "/home/cactus/prog/fpga/Xilinx/14.2/ISE_DS/ISE/bin/lin64"
                     , fpga = "XC3S500E-VQ100-5"
                     }
 
-    mod = "Chip8"
+    modName = "Chip8"
     xaws = ["dcm_32_to_50p35"]
 
 mapFileName :: (String -> String) -> FilePath -> FilePath

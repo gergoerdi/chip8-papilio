@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Video (main, emitBench, vgaFB, encodeVGA) where
+module Video (main, emitBench, vgaFB, encodeVGA, synthesize) where
 
 import Types
 import Utils
@@ -132,25 +132,35 @@ testBench = do
     initImage (x, y) = Just $ x `elem` [minBound, maxBound]
                             || y `elem` [minBound, maxBound]
 
-emitBench :: String -> Fabric () -> IO ()
-emitBench modName bench = do
+synthesize :: String -> Fabric () -> IO (String, String)
+synthesize modName bench = do
     kleg <- reifyFabric $ do
         theClk clock
         wing_init
         bench
 
-    createDirectoryIfMissing True outPath
-    writeVhdlPrelude $ outVHDL "lava-prelude"
     mod <- netlistCircuit modName kleg
     let mod' = dcm50MHz clock mod
+        vhdl = genVHDL mod' ["work.lava.all", "work.all"]
 
-    writeFile (outVHDL modName) (genVHDL mod' ["work.lava.all", "work.all"])
-    writeUCF (outPath </> modName <.> "ucf") kleg
+    ucf <- toUCF kleg
+
+    return (vhdl, ucf)
   where
     clock = "CLK_50MHZ"
 
+emitBench :: String -> Fabric () -> IO ()
+emitBench modName bench = do
+    (vhdl, ucf) <- synthesize modName bench
+
+    createDirectoryIfMissing True outPath
+    writeVhdlPrelude $ outVHDL "lava-prelude"
+    writeFile (outVHDL modName) vhdl
+    writeFile (outUCF modName) ucf
+  where
     outPath = "ise" </> "gensrc"
     outVHDL name = outPath </> name <.> "vhdl"
+    outUCF name = outPath </> name <.> "ucf"
 
 main :: IO ()
 main = do
