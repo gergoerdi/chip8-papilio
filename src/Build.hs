@@ -5,6 +5,8 @@ module Main where
 import Development.Shake
 import Development.Shake.FilePath
 import System.Directory
+import System.Console.GetOpt
+import System.Exit
 
 import Data.Monoid
 import Data.List (stripPrefix)
@@ -14,6 +16,55 @@ import qualified Data.ByteString as BS
 import Language.KansasLava.VHDL (writeVhdlPrelude)
 import qualified Chip8
 import Video (synthesize)
+
+data Flag = ImageFile FilePath
+          | XilinxRoot FilePath
+          | FPGAModel String
+
+mkXilinxConfig :: [Flag] -> IO XilinxConfig
+mkXilinxConfig flags = do
+    xilinxRoot <- case [path | XilinxRoot path <- flags] of
+        [] -> return "/home/cactus/prog/fpga/Xilinx/14.2/ISE_DS/ISE/bin/lin64"
+        [path] -> return path
+        _ -> do
+            putStrLn "Conflicting flags: --xilinx"
+            exitFailure
+
+    fpga <- case [model | FPGAModel model <- flags] of
+        [] -> return "XC3S500E-VQ100-5"
+        [model] -> return model
+        _ -> do
+            putStrLn "Conflicting flags: --fpga"
+            exitFailure
+
+    return $ XilinxConfig{..}
+
+main :: IO ()
+main = do
+    setCurrentDirectory "ise"
+    shakeArgsWith shakeOptions flags $ \flags targets -> do
+        prog <- case [fileName | ImageFile fileName <- flags] of
+            [fileName] -> BS.readFile fileName
+            _ -> do
+                putStrLn "Missing flag: --image"
+                exitFailure
+
+        xilinxConfig <- mkXilinxConfig flags
+
+        (vhdl, ucf) <- synthesize modName (Chip8.bench prog)
+        return $ Just $ do
+            want $ if null targets then [modName <.> "bit"] else targets
+
+            lavaRules modName vhdl ucf
+            xilinxRules xilinxConfig modName xaws
+  where
+    flags = [ Option [] ["image"] (ReqArg (Right . ImageFile) "filename") "CHIP-8 image file"
+            , Option [] ["xilinx"] (ReqArg (Right . XilinxRoot) "path") "Path to Xilinx toolchain"
+            , Option [] ["fpga"] (ReqArg (Right . FPGAModel) "model") "Target FPGA model"
+            ]
+
+    modName = "Chip8"
+    xaws = ["dcm_32_to_50p35"]
 
 lavaRules :: FilePath -> String -> String -> Rules ()
 lavaRules modName vhdl ucf = do
@@ -32,8 +83,11 @@ xilinxRules :: XilinxConfig
             -> [String]
             -> Rules ()
 xilinxRules XilinxConfig{..} mod xaws = do
-    textTemplate "ut" []
-    textTemplate "xst" [("MAIN", mod), ("TOP", mod)]
+    "*.ut" *>
+        textTemplate []
+
+    "*.xst" *>
+        textTemplate [("MAIN", mod), ("TOP", mod)]
 
     "*.prj" *> \target -> do
         let vhdlWork baseName = mconcat ["vhdl work \"", baseName <.> "vhdl", "\""]
@@ -70,7 +124,7 @@ xilinxRules XilinxConfig{..} mod xaws = do
                      ]
 
     "*.ngd" *> \target -> do
-        let ucf = gensrc $ mod <.> "ucf"
+        let ucf = gensrc $ target -<.> "ucf"
         need [ target -<.> "ngc"
              , ucf
              , "xst/projnav.tmp"
@@ -163,37 +217,15 @@ xilinxRules XilinxConfig{..} mod xaws = do
 
     vhdls = [mod, "lava-prelude"]
 
-    textTemplate ext replacements = do
-        ("*" <.> ext) *> \target -> do
-            let fileName = templateFile $ ext <.> "in"
-            need [fileName]
-            let subs = [ "s/@" <> binder <> "@/" <> binding <> "/g;"
-                       | (binder, binding) <- replacements
-                       ]
-            let sed = mconcat subs <> "w" <> target
-            cmd ("sed -n -e" :: String) [sed, fileName]
-
-main :: IO ()
-main = do
-    setCurrentDirectory "ise"
-
-    let filename = "/home/cactus/prog/haskell/chip8/import/CHIP8/GAMES/TETRIS"
-    prog <- BS.readFile filename
-    (vhdl, ucf) <- synthesize modName (Chip8.bench prog)
-
-    shakeArgs shakeOptions $ do
-        want [ modName <.> "bit" ]
-
-        lavaRules modName vhdl ucf
-        xilinxRules xilinxConfig modName xaws
-  where
-    xilinxConfig =
-        XilinxConfig{ xilinxRoot = "/home/cactus/prog/fpga/Xilinx/14.2/ISE_DS/ISE/bin/lin64"
-                    , fpga = "XC3S500E-VQ100-5"
-                    }
-
-    modName = "Chip8"
-    xaws = ["dcm_32_to_50p35"]
+    textTemplate replacements target = do
+        let ext = drop 1 . takeExtension $ target
+            fileName = templateFile $ ext <.> "in"
+        need [fileName]
+        let subs = [ "s/@" <> binder <> "@/" <> binding <> "/g;"
+                   | (binder, binding) <- replacements
+                   ]
+        let sed = mconcat subs <> "w" <> target
+        cmd ("sed -n -e" :: String) [sed, fileName]
 
 mapFileName :: (String -> String) -> FilePath -> FilePath
 mapFileName f fp = replaceFileName fp (f (takeFileName fp))
