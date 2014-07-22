@@ -27,7 +27,9 @@ executable chip8-papilio
         netlist >=0.3 && <0.4,
         QuickCheck,
         bytestring,
-        shake
+        shake,
+        containers,
+        text
   default-language:    Haskell2010
   other-extensions:    ScopedTypeVariables, RecordWildCards, FlexibleInstances, TypeFamilies, NoMonomorphismRestriction
   Ghc-Options:         -Werror -fwarn-unused-imports -fwarn-unused-matches

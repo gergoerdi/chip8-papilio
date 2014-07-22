@@ -1,12 +1,12 @@
 set -tmpdir "xst/projnav.tmp"
 set -xsthdpdir "xst"
 run
--ifn @MAIN@.prj
+-ifn @@MAIN@@.prj
 -ifmt mixed
--ofn @MAIN@
+-ofn @@MAIN@@
 -ofmt NGC
 -p xc3s500e-5-vq100
--top @TOP@
+-top @@TOP@@
 -opt_mode Speed
 -opt_level 1
 -iuc NO

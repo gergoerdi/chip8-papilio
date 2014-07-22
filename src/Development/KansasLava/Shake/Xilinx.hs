@@ -11,7 +11,14 @@ import System.Directory
 
 import Data.Monoid
 import Data.List (stripPrefix)
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust, fromMaybe)
+import Data.String (fromString)
+
+import Data.Text.Lazy (Text)
+import qualified Data.Text.Lazy as Text
+import qualified Data.Text.Lazy.IO as Text
+import Data.Map (Map)
+import qualified Data.Map as Map
 
 data XilinxConfig = XilinxConfig{ xilinxRoot :: FilePath
                                 , xilinxPlatform :: String
@@ -26,7 +33,7 @@ xilinxRules XilinxConfig{..} mod xaws = do
         textTemplate []
 
     "*.xst" *>
-        textTemplate [("MAIN", mod), ("TOP", mod)]
+        textTemplate [("MAIN", fromString mod), ("TOP", fromString mod)]
 
     "*.prj" *> \target -> do
         let vhdlWork baseName = mconcat ["vhdl work \"", baseName <.> "vhdl", "\""]
@@ -160,14 +167,21 @@ xilinxRules XilinxConfig{..} mod xaws = do
         let ext = drop 1 . takeExtension $ target
             fileName = templateFile $ ext <.> "in"
         need [fileName]
-        let subs = [ "s/@" <> binder <> "@/" <> binding <> "/g;"
-                   | (binder, binding) <- replacements
-                   ]
-        let sed = mconcat subs <> "w" <> target
-        cmd ("sed -n -e" :: String) [sed, fileName]
+        t <- liftIO $ Text.readFile fileName
+        writeFileChanged target $ Text.unpack . substituteTemplate replacements $ t
 
 mapFileName :: (String -> String) -> FilePath -> FilePath
 mapFileName f fp = replaceFileName fp (f (takeFileName fp))
 
 stripSuffix :: (Eq a) => [a] -> [a] -> Maybe [a]
 stripSuffix suffix = fmap reverse . stripPrefix (reverse suffix) . reverse
+
+substituteTemplate :: [(Text, Text)] -> Text -> Text
+substituteTemplate replacements = mconcat . go . Text.splitOn "@@"
+  where
+    subs :: Map Text Text
+    subs = Map.fromList replacements
+
+    go :: [Text] -> [Text]
+    go (pre:key:ts) = pre : fromMaybe key (Map.lookup key subs) : go ts
+    go ts = ts
