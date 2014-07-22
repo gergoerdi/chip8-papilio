@@ -35,6 +35,9 @@ xilinxRules XilinxConfig{..} mod xaws = do
     "*.xst" *>
         textTemplate [("MAIN", fromString mod), ("TOP", fromString mod)]
 
+    "*.xise" *>
+        textTemplate [("FILES", xiseFiles)]
+
     "*.prj" *> \target -> do
         let vhdlWork baseName = mconcat ["vhdl work \"", baseName <.> "vhdl", "\""]
         liftIO $ writeFile target . unlines $
@@ -169,6 +172,26 @@ xilinxRules XilinxConfig{..} mod xaws = do
         need [fileName]
         t <- liftIO $ Text.readFile fileName
         writeFileChanged target $ Text.unpack . substituteTemplate replacements $ t
+
+    xiseFiles = Text.unlines $
+        [ "<file xil_pn:name=\"" <> fileName <> "\" xil_pn:type=\"FILE_VHDL\">\n" <>
+          "  <association xil_pn:name=\"BehavioralSimulation\"/>\n" <>
+          "  <association xil_pn:name=\"Implementation\"/>\n" <>
+          "</file>"
+        | vhdl <- vhdls
+        , let fileName = fromString $ vhdl <.> "vhdl"
+        ] ++
+        [ "<file xil_pn:name=\"" <> fromString (mod <.> "ucf") <> "\" xil_pn:type=\"FILE_UCF\">\n" <>
+          "  <association xil_pn:name=\"Implementation\"/>\n" <>
+          "</file>"
+        ] ++
+        [ "<file xil_pn:name=\"" <> fileName <> "\" xil_pn:type=\"FILE_XAW\">\n" <>
+          "  <association xil_pn:name=\"BehavioralSimulation\"/>\n" <>
+          "  <association xil_pn:name=\"Implementation\"/>\n" <>
+          "</file>"
+        | xaw <- xaws
+        , let fileName = fromString $ ".." </> "xaw" </> xaw <.> "xaw"
+        ]
 
 mapFileName :: (String -> String) -> FilePath -> FilePath
 mapFileName f fp = replaceFileName fp (f (takeFileName fp))

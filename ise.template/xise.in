@@ -6,7 +6,7 @@
   <version xil_pn:ise_version="14.2" xil_pn:schema_version="2"/>
 
   <files>
-    <lava-files/>
+    @@FILES@@
   </files>
 
   <properties>
