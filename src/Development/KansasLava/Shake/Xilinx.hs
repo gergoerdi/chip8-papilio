@@ -20,6 +20,8 @@ import qualified Data.Text.Lazy.IO as Text
 import Data.Map (Map)
 import qualified Data.Map as Map
 
+import Paths_chip8_papilio
+
 data XilinxConfig = XilinxConfig{ xilinxRoot :: FilePath
                                 , xilinxPlatform :: String
                                 }
@@ -161,16 +163,7 @@ xilinxRules XilinxConfig{..} mod xaws = do
     gensrc f = "gensrc" </> f
     xawsrc f = gensrc $ "xaw" </> f
 
-    templateFile f = ".." </> "ise.template" </> f
-
     vhdls = [mod, "lava-prelude"]
-
-    textTemplate replacements target = do
-        let ext = drop 1 . takeExtension $ target
-            fileName = templateFile $ ext <.> "in"
-        need [fileName]
-        t <- liftIO $ Text.readFile fileName
-        writeFileChanged target $ Text.unpack . substituteTemplate replacements $ t
 
     xiseFiles = Text.unlines $
         [ "<file xil_pn:name=\"" <> fileName <> "\" xil_pn:type=\"FILE_VHDL\">\n" <>
@@ -191,6 +184,13 @@ xilinxRules XilinxConfig{..} mod xaws = do
         | xaw <- xaws
         , let fileName = fromString $ ".." </> "xaw" </> xaw <.> "xaw"
         ]
+
+textTemplate :: [(Text, Text)] -> FilePath -> Action ()
+textTemplate replacements target = do
+    let ext = drop 1 . takeExtension $ target
+        templateName = ext <.> "in"
+    t <- liftIO $ Text.readFile =<< getDataFileName ("ise.template" </> templateName)
+    writeFileChanged target $ Text.unpack . substituteTemplate replacements $ t
 
 mapFileName :: (String -> String) -> FilePath -> FilePath
 mapFileName f fp = replaceFileName fp (f (takeFileName fp))

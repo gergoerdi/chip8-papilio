@@ -15,7 +15,8 @@ cabal-version:       >=1.10
 executable chip8-papilio
   hs-source-dirs:      src
   main-is:             Build.hs
-  -- other-modules:
+  Other-modules:
+        Paths_chip8_papilio
   build-depends:
         base >=4.7 && < 5,
         kansas-lava >=0.2.4 && < 0.2.5,
