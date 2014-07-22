@@ -44,7 +44,7 @@ xilinxRules XilinxConfig{..} mod xaws = do
           map (vhdlWork . gensrc) vhdls ++ map (vhdlWork . xawsrc) xaws
 
     xawsrc "*.vhdl" *> \target -> do
-        let xaw = ipcore $ takeBaseName target <.> "xaw"
+        let xaw = ".." </> "xaw" </> takeFileName target -<.> "xaw"
         need [xaw]
         removeFilesAfter "." ["xaw2vhdl.log"]
         xilinx "xaw2vhdl" [xaw, "-st", "XST", target]
@@ -158,7 +158,6 @@ xilinxRules XilinxConfig{..} mod xaws = do
   where
     xilinx tool args = cmd (xilinxRoot </> tool) args
 
-    ipcore f = "ipcore_dir" </> f
     gensrc f = "gensrc" </> f
     xawsrc f = gensrc $ "xaw" </> f
 

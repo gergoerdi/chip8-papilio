@@ -39,6 +39,7 @@ mkXilinxConfig flags = do
 
 main :: IO ()
 main = do
+    createDirectoryIfMissing True "ise"
     setCurrentDirectory "ise"
     shakeArgsWith shakeOptions flags $ \flags targets -> do
         prog <- case [fileName | ImageFile fileName <- flags] of
