@@ -1,6 +1,6 @@
 name:                chip8-papilio
 version:             0.0.0.0
-synopsis:            Implementation of the CHIP-8 virtual microcomputer on the Papilio Plus FPGA
+synopsis:            Implementation of the CHIP-8 virtual microcomputer on the Papilio FPGA family
 -- description:
 license:             GPL-2
 license-file:        LICENSE
