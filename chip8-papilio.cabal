@@ -19,7 +19,7 @@ executable chip8-papilio
         base >=4.7 && < 5,
         kansas-lava >=0.2.4 && < 0.2.5,
         netlist-to-vhdl >=0.3 && <0.4,
-        kansas-lava-papilio ==0.0.3,
+        kansas-lava-papilio ==0.1.0,
         kansas-lava-shake >= 0.1 && < 0.2,
         sized-types >=0.3,
         filepath,

@@ -16,7 +16,7 @@ Software Dependencies
 Hardware Dependencies
 ---------------------
 
-* Papilio One 500K
+* Papilio One 500K or Papilio Pro
 * Papilio Arcade MegaWing
 * PS/2 keyboard
 * VGA screen

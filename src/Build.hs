@@ -10,16 +10,18 @@ import System.Console.GetOpt
 import System.Exit
 
 import qualified Data.ByteString as BS
+import Data.Char (toLower)
 
+import Hardware.KansasLava.Boards.Papilio.Arcade (Model(..))
 import Language.KansasLava.VHDL (writeVhdlPrelude)
 import qualified Chip8
 import Video (synthesize)
 
 data Flag = ImageFile FilePath
           | XilinxRoot FilePath
-          | FPGAModel String
+          | PapilioModel String
 
-mkXilinxConfig :: [Flag] -> IO XilinxConfig
+mkXilinxConfig :: [Flag] -> IO (XilinxConfig, Model)
 mkXilinxConfig flags = do
     xilinxRoot <- case [path | XilinxRoot path <- flags] of
         [] -> return "/home/cactus/prog/fpga/Xilinx/14.2/ISE_DS/ISE/bin/lin64"
@@ -28,14 +30,18 @@ mkXilinxConfig flags = do
             putStrLn "Conflicting flags: --xilinx"
             exitFailure
 
-    xilinxPlatform <- case [model | FPGAModel model <- flags] of
-        [] -> return "XC3S500E-VQ100-5"
-        [model] -> return model
+    (xilinxPlatform, papilioModel) <- case [model | PapilioModel model <- flags] of
+        [] -> do
+            putStrLn "Defaulting to Papilio One"
+            return ("XC3S500E-VQ100-5", PapilioOne)
+        [model] -> return $ case map toLower model of
+            "one" -> ("XC3S500E-VQ100-5", PapilioOne)
+            "pro" -> ("XC6SLX9-TQG144-2", PapilioPro)
         _ -> do
-            putStrLn "Conflicting flags: --fpga"
+            putStrLn "Conflicting flags: --papilio"
             exitFailure
 
-    return $ XilinxConfig{..}
+    return (XilinxConfig{..}, papilioModel)
 
 main :: IO ()
 main = do
@@ -48,9 +54,9 @@ main = do
                 putStrLn "Missing flag: --image"
                 exitFailure
 
-        xilinxConfig <- mkXilinxConfig flags
+        (xilinxConfig, model) <- mkXilinxConfig flags
 
-        (vhdl, ucf) <- synthesize modName (Chip8.bench prog)
+        (vhdl, ucf) <- synthesize model modName (Chip8.bench prog)
         return $ Just $ do
             want $ if null targets then [modName <.> "bit"] else targets
 
@@ -59,7 +65,7 @@ main = do
   where
     flags = [ Option [] ["image"] (ReqArg (Right . ImageFile) "filename") "CHIP-8 image file"
             , Option [] ["xilinx"] (ReqArg (Right . XilinxRoot) "path") "Path to Xilinx toolchain"
-            , Option [] ["fpga"] (ReqArg (Right . FPGAModel) "model") "Target FPGA model"
+            , Option [] ["papilio"] (ReqArg (Right . PapilioModel) "model") "Target Papilio model (One/Pro)"
             ]
 
     modName = "Chip8"

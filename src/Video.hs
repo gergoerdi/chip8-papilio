@@ -11,6 +11,7 @@ import Language.KansasLava
 import Language.KansasLava.VHDL
 import Language.Netlist.GenVHDL
 import Language.KansasLava.Signal.Utils
+import Hardware.KansasLava.Boards.Papilio
 import Hardware.KansasLava.Boards.Papilio.Arcade
 import Hardware.KansasLava.VGA
 import Hardware.KansasLava.VGA.Driver
@@ -132,8 +133,8 @@ testBench = do
     initImage (x, y) = Just $ x `elem` [minBound, maxBound]
                             || y `elem` [minBound, maxBound]
 
-synthesize :: String -> Fabric () -> IO (String, String)
-synthesize modName bench = do
+synthesize :: Model -> String -> Fabric () -> IO (String, String)
+synthesize model modName bench = do
     kleg <- reifyFabric $ do
         theClk clock
         wing_init
@@ -143,15 +144,15 @@ synthesize modName bench = do
     let mod' = dcm50MHz clock mod
         vhdl = genVHDL mod' ["work.lava.all", "work.all"]
 
-    ucf <- toUCF kleg
+    ucf <- toUCF model kleg
 
     return (vhdl, ucf)
   where
     clock = "CLK_50MHZ"
 
-emitBench :: String -> Fabric () -> IO ()
-emitBench modName bench = do
-    (vhdl, ucf) <- synthesize modName bench
+emitBench :: Model -> String -> Fabric () -> IO ()
+emitBench model modName bench = do
+    (vhdl, ucf) <- synthesize model modName bench
 
     createDirectoryIfMissing True outPath
     writeVhdlPrelude $ outVHDL "lava-prelude"
@@ -164,4 +165,4 @@ emitBench modName bench = do
 
 main :: IO ()
 main = do
-    emitBench "Video" testBench
+    emitBench PapilioOne "Video" testBench

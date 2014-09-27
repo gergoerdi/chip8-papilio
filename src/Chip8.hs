@@ -87,4 +87,4 @@ main = do
     -- let filename = "/home/cactus/prog/haskell/chip8/games/2048/2048.ch8"
     let filename = "/home/cactus/prog/haskell/chip8/import/CHIP8/GAMES/TETRIS"
     prog <- BS.readFile filename
-    emitBench "Chip8" $ bench prog
+    emitBench PapilioOne "Chip8" $ bench prog

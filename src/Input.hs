@@ -114,4 +114,4 @@ testBench = do
 
 main :: IO ()
 main = do
-    emitBench "Input" testBench
+    emitBench PapilioOne "Input" testBench
