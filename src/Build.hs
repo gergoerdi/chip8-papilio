@@ -2,6 +2,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module Main where
 
+import Development.KansasLava.Shake
 import Development.KansasLava.Shake.Xilinx
 import Development.Shake
 import Development.Shake.FilePath
@@ -13,7 +14,6 @@ import qualified Data.ByteString as BS
 import Data.Char (toLower)
 
 import Hardware.KansasLava.Boards.Papilio.Arcade (Model(..))
-import Language.KansasLava.VHDL (writeVhdlPrelude)
 import qualified Chip8
 import Video (synthesize)
 
@@ -70,11 +70,3 @@ main = do
 
     modName = "Chip8"
     xaws = ["dcm_32_to_50p35"]
-
-lavaRules :: FilePath -> String -> String -> Rules ()
-lavaRules modName vhdl ucf = do
-    gensrc modName <.> "vhdl" *> \target -> writeFileChanged target vhdl
-    gensrc modName <.> "ucf" *> \target -> writeFileChanged target ucf
-    gensrc "lava-prelude.vhdl" *> liftIO . writeVhdlPrelude
-  where
-    gensrc f = "gensrc" </> f
