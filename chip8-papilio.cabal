@@ -15,12 +15,13 @@ cabal-version:       >=1.10
 executable chip8-papilio
   hs-source-dirs:      src
   main-is:             Build.hs
+  other-modules:       Chip8 Types Utils ALU CPU DCM Video Font Input
   build-depends:
         base >=4.7 && < 5,
         kansas-lava >=0.2.4 && < 0.2.5,
         netlist-to-vhdl >=0.3 && <0.4,
-        kansas-lava-papilio ==0.1.0,
-        kansas-lava-shake >= 0.1.1 && < 0.2,
+        kansas-lava-papilio == 0.3.1,
+        kansas-lava-shake >= 0.1.3 && < 0.2,
         sized-types >=0.3,
         filepath,
         directory,

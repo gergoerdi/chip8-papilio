@@ -21,7 +21,6 @@ import Data.Sized.Ix
 import Data.Foldable (toList)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
-import Data.Monoid
 
 linkProg :: ByteString -> ByteString
 linkProg = (prelude <>)

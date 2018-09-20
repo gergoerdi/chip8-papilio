@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, TypeFamilies #-}
+{-# LANGUAGE ScopedTypeVariables, TypeFamilies, FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
 module ALU (alu, bcd, lfsr) where
 

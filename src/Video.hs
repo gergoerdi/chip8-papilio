@@ -1,6 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances, FlexibleContexts #-}
 module Video (main, emitBench, vgaFB, encodeVGA, synthesize) where
 
 import Types
@@ -31,7 +31,7 @@ drive64x32 VGADriverIn{..} = (newPixel,
                                           , vgaOutY = y'
                                           , ..})
   where
-    VGADriverOut{..} = driveVGA vga640x480at60 (VGADriverIn r g b)
+    VGADriverOut{..} = driveVGA (Witness :: Witness X2) vga640x480at60 (VGADriverIn r g b)
 
     (validX, x) = unpackEnabled vgaOutX
     (validY, y) = unpackEnabled vgaOutY
